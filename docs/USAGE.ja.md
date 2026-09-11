@@ -6,8 +6,8 @@ SteamVR を OpenXR ランタイムに指定し、
 HMD・バー中央のTracker・心拍計を起動します。ローイングマシンは漕いで
 起こしてください。スマートフォンのアプリが接続中なら切断します。
 
-PowerShellでこのリポジトリを開き、`./run.ps1 "Koh Hong"` を実行します。
-機器を使わないデモは `./run.ps1 "Koh Hong" -Demo` です。
+PowerShellでこのリポジトリを開き、`./row.ps1 "Koh Hong"` を実行します。
+機器を使わないデモは `./row.ps1 "Koh Hong" -Demo` です。
 
 - **テンキーEnter**：開始前の校正へ進みます。下の3段階で自動的に開始します。
 - 運動中の **テンキーEnter**：一時停止。再開時も校正します。
@@ -65,7 +65,7 @@ BTで1000 W、Tracker推定で240 Wです。船には従来の水抵抗・加速
 ハンドルを止めると推進は止まり、艇は惰性で進みます。負荷は本体のダイヤルで
 変更し、アプリから本体を操作しません。
 
-記録先は `unreal/ArriettyCesium/Saved/Sessions/` のCSVです。艇の距離・時間・速度・
+記録先は `apps/row/unreal/ArriettyCesium/Saved/Sessions/` のCSVです。艇の距離・時間・速度・
 心拍数に加えて、本体が報告する距離・時間・速度・出力も別の列に保存します。
 左右位置、操舵量、旋回速度も保存し、偏りを後から確認できます。
 `power_w` は本体の元のWです。`resistance_level` に受信負荷、`power_multiplier`
@@ -100,9 +100,9 @@ Trackerが戻ると `BAR RETURNING / COASTING` になり、0.15秒連続して�
 行いません。実際の見え隠れでの補助効果や Cesium を使った実機の動作は、
 このフォークでは未検証です。
 
-`./run.ps1 "Koh Hong"` で通常起動すると、動作ログ `logs/training.log` を毎回上書きします。
+`./row.ps1 "Koh Hong"` で通常起動すると、動作ログ `logs/row/training.log` を毎回上書きします。
 このファイルの世代バックアップは作りません。距離・時間などのトレーニング履歴CSVは
-`unreal/ArriettyCesium/Saved/Sessions/` に運動ごとに保存します。過去に検証用として
+`apps/row/unreal/ArriettyCesium/Saved/Sessions/` に運動ごとに保存します。過去に検証用として
 保存したログ・姿勢記録・画像も別に保管します。動作ログの不具合を調べる場合は、
 次回起動で上書きされる前に確認してください。
 
@@ -118,6 +118,6 @@ Trackerが戻ると `BAR RETURNING / COASTING` になり、0.15秒連続して�
 
 入水・引く音は漕ぎ動作、水切り音は船速に連動します。待機・校正・一時停止中は
 静かな水面と風だけが鳴ります。左は右より6 dB大きくしてあります。
-通常起動で有効です。音量を下げる場合は `./run.ps1 "Koh Hong" -Volume 0.5`、
+通常起動で有効です。音量を下げる場合は `./row.ps1 "Koh Hong" -Volume 0.5`、
 消音は `-Volume 0` を使います（範囲0〜1、初期値0.8）。
 素材や音のつなぎ方は [効果音の説明](AUDIO.ja.md) を参照してください。

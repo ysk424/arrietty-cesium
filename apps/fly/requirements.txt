@@ -1,0 +1,5 @@
+pyproj==3.7.2
+shapely==2.1.2
+numpy==2.5.3
+timezonefinder==8.3.0
+tzdata==2026.3

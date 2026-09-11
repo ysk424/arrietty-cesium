@@ -5,11 +5,11 @@
 Kelvin wakes and bow whitewater are inherited from Arrietty-row. Normal launches
 and further development use the original `Arrietty-row` checkout. The temporary
 feature worktree is retired; its local evidence is preserved in the main
-checkout under `logs/kelvin-worktree/` and `artifacts/kelvin-worktree/`.
+checkout under `logs/row/kelvin-worktree/` and `apps/row/artifacts/kelvin-worktree/`.
 
 ## Model
 
-`Source/RowKelvin.h` solves linear **deep-water gravity waves**, in metres and
+`apps/row/Source/RowKelvin.h` solves linear **deep-water gravity waves**, in metres and
 seconds, using surface displacement `eta` and surface velocity potential `phi`:
 
 ```
@@ -51,7 +51,7 @@ respective sides. Texture origin changes accompany uploads to avoid sliding
 between texture updates. Existing wind ripples, the 22–28 m surface fade, mean
 lake reference **Z=0 cm**, scenery, and level HMD root remain in place.
 
-`Source/RowBowWhitewater.h` adds speed-driven bow whitewater. Its two shoulders
+`apps/row/Source/RowBowWhitewater.h` adds speed-driven bow whitewater. Its two shoulders
 join at 2.4 m ahead of the boat origin, outside the 2.3 m hull tip. Emission is
 zero below 0.4 m/s, grows smoothly with boat speed, and is bounded at high speed.
 The profile length/width grow with speed; a saturating rate deposits foam into
@@ -83,7 +83,7 @@ py -3.13 tools/plot_water.py
 ```
 
 `plot_water.py` needs NumPy and Matplotlib, only for offline verification. Native
-tests export synthetic fields under ignored `artifacts/water/`. The plot and
+tests export synthetic fields under ignored `apps/row/artifacts/water/`. The plot and
 `measurements.json` measure the actual C++ results; dashed theoretical lines in
 the plot are annotations, not inputs to the solver. Speed, position and steering
 in these fixtures are synthetic, with no BLE or real Tracker connection.

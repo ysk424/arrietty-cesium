@@ -1,14 +1,27 @@
-# Arrietty-cesium
-Read README.md and docs/HANDOFF.md before changes.
-Independent fork of Arrietty-row 316f4b2. Do not modify sibling projects.
-Reuse the accepted rowing, VR calibration, HMD lateral steering, water and audio.
-Mean water at the launch origin is Z=0 cm; away from origin it curves. Cesium origin height is water surface WGS84
-ellipsoid height (metres); never confuse lake bottom, MSL or ellipsoid heights.
-Never silently use sea level for an unknown lake. Ocean and lake only.
-Location confirmation accepts only Y; N or EOF exits without launching UE.
-Keep secrets, device IDs, health/session data, generated UE assets, downloaded
-plugins and SDKs out of Git. Never print API tokens or put them on command lines.
-BLE is telemetry only; never write rower resistance/control points.
-Enter setup semantics and numpad 0 stop/home remain unchanged. Missing HR is --.
-Record actual tests and their limits honestly; do not inherit upstream acceptance
-as evidence of Cesium visual/VR correctness.
+# Arrietty Cesium
+
+Read README.md and docs/HANDOFF.md before changes. docs/INTEGRATION.md defines
+coordinates, height, terrain and process boundaries. Do not modify siblings.
+
+- apps/row and apps/fly are independent UE applications; root row.ps1/fly.ps1
+  are the user launchers. Share geography helpers, not their control models.
+- Row preserves accepted rowing, calibration, HMD lateral steering, water and
+  audio. Mean launch water is Z=0; away from origin it curves. Sea/lake only.
+  Never silently substitute sea level or terrain bottom for an unknown lake.
+  BLE rower telemetry is read-only. Enter and numpad 0 semantics stay unchanged.
+- Fly preserves UE58 Button 1 view-forward alignment, R recenter, handle steering,
+  flight controls and device-worker shutdown. Its T2 load control is inherited
+  from UE58 and is separate from the rower telemetry-only restriction.
+- Fly ground origin is sampled WGS84 ellipsoid height. Flight height, MSL and
+  AGL are distinct; allow negative launch-relative height. Unknown terrain must
+  not become zero. Keep the geography readiness gate before hardware/motion.
+- All normal place launchers require explicit Y; N/EOF exits before scene/UE.
+- Settings, IDs, secrets, health/session logs, generated assets, downloaded
+  plugins/SDKs and caches stay out of Git. Never print tokens or pass them in argv.
+- Record actual tests and limitations. No demo/native test establishes live VR
+  acceptance. Check running processes before rebuilding; do not stop a live ride.
+- Fly is a human-powered glider. Sound production is pending user-supplied
+  masters; docs/FLY_AUDIO.ja.md is the proposed five-core/one-optional sound brief.
+  Keep glide wind after pedalling stops. No engine audio or automatic changes
+  to hardware loads/fan response when adding movement/audio effects.
+- Check the staged public tree before publication. Do not publish unless asked.

@@ -1,5 +1,7 @@
 /settings.local.json
-/.venv/
+**/.venv/
+**/.runtime/
+**/artifacts/
 /logs/
 /artifacts/
 /ThirdParty/
@@ -14,9 +16,11 @@
 *.VC.db
 __pycache__/
 *.pyc
-/sounds/*.wav
-/sounds/*.wava
-/sounds/*.pkf
+**/sounds/*.wav
+**/sounds/*.wava
+**/sounds/*.pkf
+/apps/fly/sounds/*
+!/apps/fly/sounds/README.md
 /Firefly_audio/
 
 /cesium.local.json
@@ -26,6 +30,9 @@ __pycache__/
 /.env
 /.env.*
 /*.local.json
+**/*.local.json
+**/__pycache__/
+**/.pytest_cache/
 *.bundle
 *.pem
 *.key

@@ -1,0 +1,14 @@
+{
+  "bleak-3.0.2-py3-none-any.whl": "39092feb9e83f1df5ad2f88e837723c7211c982ce9e9cda6235104bc2ebe0d0d",
+  "openvr-2.12.1401-py3-none-any.whl": "ef761cef3162843a8025a7812d5e244fd94ab3a992ca8f5ef0d1b0188ad56cb3",
+  "typing_extensions-4.16.0-py3-none-any.whl": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+  "winrt_runtime-3.2.1-cp313-cp313-win_amd64.whl": "3c1fdcaeedeb2920dc3b9039db64089a6093cad2be56a3e64acc938849245a6d",
+  "winrt_windows_devices_bluetooth-3.2.1-cp313-cp313-win_amd64.whl": "6703dfbe444ee22426738830fb305c96a728ea9ccce905acfdf811d81045fdb3",
+  "winrt_windows_devices_bluetooth_advertisement-3.2.1-cp313-cp313-win_amd64.whl": "b66410c04b8dae634a7e4b615c3b7f8adda9c7d4d6902bcad5b253da1a684943",
+  "winrt_windows_devices_bluetooth_genericattributeprofile-3.2.1-cp313-cp313-win_amd64.whl": "8d8d89f01e9b6931fb48217847caac3227a0aeb38a5b7782af71c2e7b262ec30",
+  "winrt_windows_devices_enumeration-3.2.1-cp313-cp313-win_amd64.whl": "6ca40d334734829e178ad46375275c4f7b5d6d2d4fc2e8879690452cbfb36015",
+  "winrt_windows_devices_radios-3.2.1-cp313-cp313-win_amd64.whl": "bf1a975f46a2aa271ffea1340be0c7e64985050d07433e701343dddc22a72290",
+  "winrt_windows_foundation-3.2.1-cp313-cp313-win_amd64.whl": "6e98617c1e46665c7a56ce3f5d28e252798416d1ebfee3201267a644a4e3c479",
+  "winrt_windows_foundation_collections-3.2.1-cp313-cp313-win_amd64.whl": "5e12a6e75036ee90484c33e204b85fb6785fcc9e7c8066ad65097301f48cdd10",
+  "winrt_windows_storage_streams-3.2.1-cp313-cp313-win_amd64.whl": "202c5875606398b8bfaa2a290831458bb55f2196a39c1d4e5fa88a03d65ef915"
+}

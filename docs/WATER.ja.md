@@ -29,7 +29,7 @@ UE のゲーム画面では、その波を水面の凹凸と光の反射とし�
 PowerShell で `arrietty-cesium` フォルダーを開き、SteamVR と機器を準備します。
 
 ```powershell
-./run.ps1 "Koh Hong"
+./row.ps1 "Koh Hong"
 ```
 
 操作は従来どおりです。Enter → 2 秒待機 → 1 秒静止 → バーを 2 往復で開始。
@@ -39,10 +39,10 @@ Enter で一時停止・再開、テンキー 0 で停止・出発位置へ戻�
 機器を使わずに通常のデモを見る場合：
 
 ```powershell
-./run.ps1 "Koh Hong" -Demo
+./row.ps1 "Koh Hong" -Demo
 ```
 
-運動記録は通常の `unreal/ArriettyCesium/Saved/Sessions/` に保存されます。
+運動記録は通常の `apps/row/unreal/ArriettyCesium/Saved/Sessions/` に保存されます。
 機器設定や記録は Git 管理外です。
 
 ## モデルの限界

@@ -1,5 +1,6 @@
 """Audit the entire index or all reachable Git history; never print private matches."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -8,7 +9,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 PRIVATE_DIRS = {'thirdparty', 'logs', 'saved', 'content', 'artifacts', '.venv',
-                'plugins', 'cache', 'binaries', 'intermediate', 'deriveddatacache', '.vs'}
+                'plugins', 'cache', 'binaries', 'intermediate', 'deriveddatacache', '.vs', '.runtime'}
 PRIVATE_SUFFIXES = {'.dll', '.exe', '.uasset', '.umap', '.bin', '.blend', '.fbx',
                     '.glb', '.pdf', '.csv', '.wav', '.wava', '.pkf', '.bundle',
                     '.pem', '.key', '.pdb', '.log'}
@@ -26,7 +27,7 @@ def git(*args):
 
 def private_values():
     values = []
-    for filename in ('settings.local.json', 'cesium.local.json'):
+    for filename in ('config/row.local.json', 'config/fly.local.json', 'config/cesium.local.json'):
         path = ROOT / filename
         if path.exists():
             config = json.loads(path.read_text(encoding='utf-8-sig'))
@@ -85,9 +86,14 @@ def audit(history=False):
             else:
                 entries.add((name.decode('utf-8'), oid))
     checked = {}
+    wheel_hashes = json.loads((ROOT/'apps/fly/wheels.lock.json').read_text(encoding='utf-8'))
     for name, oid in sorted(entries):
         if forbidden_path(name):
             bad.add(name)
+            continue
+        if name.startswith('apps/fly/wheels/') and name.endswith('.whl'):
+            digest=hashlib.sha256(git('cat-file','blob',oid)).hexdigest()
+            if wheel_hashes.get(Path(name).name)!=digest: bad.add(name)
             continue
         if oid not in checked:
             checked[oid] = private_content(git('cat-file', 'blob', oid), values)

@@ -5,7 +5,7 @@ Tracker. Its effect during actual occlusion and prolonged Cesium VR use remains
 unverified in this fork. There is no change to device selection, BLE
 telemetry, calibration or the physical steering frame.
 
-`Source/RowTracking.h` receives bar and HMD positions projected onto the
+`apps/row/Source/RowTracking.h` receives bar and HMD positions projected onto the
 calibrated machine axis. While both are tracked, it fits bar versus head
 position from up to 64 paired samples, at most 10 Hz, using the last six
 seconds. It requires at least 10 samples, bar/head spans of 20/12 cm, positive
@@ -59,7 +59,7 @@ when stopped. `ROW_TRACKING` logs source, duration, issue, frame duration and
 validity flags. `ROW_CALIBRATION_FAILED` logs the exact failing frame's duration,
 pose ages and validity, without changing setup behavior. No high-rate pose
 recording is enabled and no device identities enter these logs.
-Normal `run.ps1` launches overwrite `logs/training.log`, with no automatic
+Normal `row.ps1` launches overwrite `logs/row/training.log`, with no automatic
 per-launch backup for that file. Session CSV history and intentionally archived
 diagnostic/test evidence retain their separate files.
 

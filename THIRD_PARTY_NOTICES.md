@@ -21,9 +21,26 @@
   SDK and license are staged locally. https://github.com/ValveSoftware/openvr
 - Five Adobe Firefly sound masters were provided by the rider. WAVs and generated
   UE audio stay local and do not inherit the application MIT license.
-  See sounds/README.md.
+  See apps/row/sounds/README.md.
 - Instrument exposure setup adapts MIT Arrietty-UE58, same copyright.
 - Optional inherited device diagnostics use Bleak (MIT) and pyopenvr (MIT).
 
-No old Lake Bled scenery, Epic code, third-party binaries, device identifiers,
-API credentials or exercise records are committed in this repository.
+No old Lake Bled scenery, Epic engine code/binaries, downloaded Cesium plugin,
+device identifiers, API credentials or exercise records are committed. The
+pinned flight dependency wheels are the explicitly retained binary dependencies.
+
+
+## Flight integration
+
+Flight application code was copied from Arrietty-UE58 ef86436 (MIT). The retained
+BLE/OpenVR/WinRT wheels and their license metadata are in apps/fly/wheels; their
+exact hashes are recorded in apps/fly/wheels.lock.json. Additional geography
+dependencies are pyproj, Shapely, NumPy, timezonefinder and tzdata, with their
+license files installed in the isolated environment. See also
+[flight notices](apps/fly/THIRD_PARTY_NOTICES.md).
+
+The deterministic NOAA-based solar position function was adapted from the MIT
+Secret-World solar.py module, version 0.1.0. Its Blender-specific editor code and
+scenery are not used. Geographic timezones use timezonefinder and IANA tzdata.
+Both applications use the Cesium dynamic attribution system; OSM data is credited
+to OpenStreetMap contributors under ODbL.

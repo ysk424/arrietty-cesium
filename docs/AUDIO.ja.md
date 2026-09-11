@@ -25,10 +25,10 @@
 初期音量は0.8。通常は次のように起動できます。
 
 ```powershell
-./run.ps1 "Koh Hong"
-./run.ps1 "Koh Hong" -Volume 0.5
-./run.ps1 "Koh Hong" -Demo -Volume 0.5
-./run.ps1 "Koh Hong" -Volume 0
+./row.ps1 "Koh Hong"
+./row.ps1 "Koh Hong" -Volume 0.5
+./row.ps1 "Koh Hong" -Demo -Volume 0.5
+./row.ps1 "Koh Hong" -Volume 0
 ```
 
 `Volume` は0〜1で、0は消音です。左右の6 dB差は全体音量を変えても維持します。
@@ -43,7 +43,7 @@ OS・ヘッドホン側の音量や左右設定は変更しません。
 
 開発時は `./tools/build_native.ps1` と `./tools/test_audio.ps1` で検証します。
 後者は機器を接続しないUEデモを起動し、ゲームの出力だけを30秒録音します。
-マイク録音は行いません。ログ・WAV・測定結果は無視対象の `logs/`、`artifacts/audio/`
+マイク録音は行いません。ログ・WAV・測定結果は無視対象の `logs/row/`、`apps/row/artifacts/audio/`
 およびUEの `Saved/AudioCapture/` に保存します。ヘッドホンでの聞こえ方や
 長時間の快適さは、出力データの検査だけでは判断できません。
 
