@@ -1,0 +1,49 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.8",
+  "Category": "Simulation",
+  "Description": "Row anywhere: real Cesium terrain and UE rowing water",
+  "Modules": [
+    {
+      "Name": "ArriettyRow",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "OpenXR",
+      "Enabled": true
+    },
+    {
+      "Name": "XRBase",
+      "Enabled": true
+    },
+    {
+      "Name": "ProceduralMeshComponent",
+      "Enabled": true
+    },
+    {
+      "Name": "PythonScriptPlugin",
+      "Enabled": true,
+      "TargetAllowList": [
+        "Editor"
+      ]
+    },
+    {
+      "Name": "EditorScriptingUtilities",
+      "Enabled": true,
+      "TargetAllowList": [
+        "Editor"
+      ]
+    },
+    {
+      "Name": "AndroidFileServer",
+      "Enabled": false
+    },
+    {
+      "Name": "CesiumForUnreal",
+      "Enabled": true
+    }
+  ]
+}
