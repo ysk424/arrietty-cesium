@@ -24,6 +24,16 @@ project extracts its own plugin build tree from the same verified archive.
 
 - Row: the launch mean water surface is local Z=0; its existing curved water
   model and lake MSL evidence requirements remain unchanged.
+  Lake launch selection prefers 150 m shoreline clearance, falling back to the
+  original 40 m only when the lake has no 150 m interior. Five successful open-water
+  terrain probes still gate readiness. If all exceed known water by >3 cm, their
+  spread is <=25 cm and the largest excess is <=50 m, Row translates its terrain
+  tileset (rendering and collision together) down by that excess. This bounded
+  display alignment handles flat elevated lake sheets; it does not establish a
+  measured lake elevation or alter MSL, EGM96, georeference, curved water or HMD.
+  It is logged as ROW_LAKE_TERRAIN_ALIGNMENT. Terrain above water outside those
+  bounds, failed samples and unknown lake levels still block. Oceans receive no
+  such alignment. This Row-only display offset is not a Fly terrain/AGL datum.
 - Fly: launch ground height h0 is sampled from Cesium in WGS84 ellipsoid metres.
   The chosen ground point becomes the fixed CesiumGeoreference origin.
 - Flight altitude_meters and the transport pose Z are h - h0. Negative values
@@ -87,6 +97,19 @@ not a surveyed water level. Fly uses Cesium water imagery, without row's custom
 wave shader. Row's independent high-lake water system is retained.
 
 ## Controls and time
+
+Row optionally selects `bar_input=wt9011dcl` in its private settings. A separate
+native GATT worker reads WIT FFE5/FFE4 (vendor UUID suffix 5f9a34fb), with the
+advertised or previously verified address type. It subscribes only; no control
+or sensor-configuration commands are sent. Acceleration is rotated by sensor
+attitude, gravity is measured during setup, and two initial cycles fit the
+horizontal pull axis. This AHRS frame is independent of SteamVR. Consequently
+IMU setup explicitly uses averaged forward-facing HMD yaw for the fixed room
+steering frame; the original Tracker trajectory fit remains in Tracker mode.
+The bounded velocity estimate gates the existing rowing model, never creates
+a fictitious absolute bar pose, and is recorded as `imu_velocity`. HMD lateral
+steering, controls, water and audio stay intact. Stale IMU >=.25 s stops the ride
+without HMD handle assistance or auto-restart. See ROW_IMU.ja.md for limitations.
 
 Python still owns flight dynamics and hardware workers. UE still owns OpenXR,
 camera alignment and UI. P enables device preparation only after geography is

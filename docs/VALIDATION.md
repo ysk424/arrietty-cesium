@@ -1,5 +1,112 @@
 # Row / Fly integration validation — 2026-09-12
 
+## Row user confirmation after fixes
+
+On 2026-09-12 the user reported successful operation after the OpenVR path fix
+and requested documentation and push. The subsequent normal launch log contains
+ROW_OPENVR_LIBRARY available=1, ROW_GEOGRAPHY_READY, calibration progression and
+ROW_CONTROL action=start. This confirms resolution of the startup blockers and
+initial live setup/start. It is separate from the offline evidence below; no
+long-session classification accuracy, slow/short-stroke performance or detailed
+steering/audio comfort result was reported. Session data and device identities
+remain in ignored local storage.
+
+Before publication, the entire staged tree passed the public-tree audit. The
+audit now excludes only the known `bar_input` enum values from private-value
+matching; addresses, serials, tokens and unknown values remain protected. Direct
+checks confirmed that every collected private value is still detected, and both
+commit identities use GitHub noreply addresses. Unrelated Fly audio changes were
+left in the working tree for their separate publication.
+
+## Row OpenVR runtime path follow-up
+
+- The user's live Row launch logged ROW_OPENVR_LIBRARY available=0 and never
+  started calibration or rowing. The SDK bootstrap verified every pinned hash;
+  the SDK existed, but the module used six parent traversals from its project
+  directory instead of four to workspace/ThirdParty/OpenVR.
+- Corrected that development DLL fallback; retained executable/project binary
+  lookup and deferred OpenVR shutdown. Closed only the failed pre-start Row
+  instance normally and rebuilt successfully with UE 5.8.2.
+- The actual UE process then logged ROW_OPENVR_LIBRARY available=1, passed the
+  existing SetupEnter test and returned exit code 0. The automation runner used
+  its test-complete exit path; it did not log module shutdown. No HMD or BLE
+  workers were initialized in this offline test. This establishes DLL loading
+  and control regression coverage; the later user confirmation is recorded above.
+- Ignored evidence: logs/row/openvr-before-fix.local.log,
+  openvr-path-ue-build.log, and setup-controls-20260912-134616.log.
+
+## Row Moraine Lake terrain follow-up
+
+- The user's confirmed normal place launch failed before calibration/start.
+  Logs gave terrain minus known water = 26.896–36.004 m over five probes at the
+  original launch, with the rendered mesh above the boat. A diagnostic using
+  CesiumJS 1.133.0 sampleTerrainMostDetailed sampled 20 locations at 40/80/120/160 m
+  shore clearance. Interior samples were nearly flat at about +35.98 m; this
+  establishes a dataset/water-level discrepancy, not its geodetic cause. Known
+  lake MSL remained 1884 m; no terrain-derived water elevation was substituted.
+- The revised scene has approximately 149.85 m shoreline clearance after local
+  polygon conversion/simplification. Its five UE probes range from +35.975 to
+  +35.979 m. Row translated only its terrain actor by -35.979 m, leaving water,
+  georeference and HMD coordinates unchanged. The original scene is retained.
+- MSVC native suite passed 275 checks, including 13 added terrain checks for
+  submerged terrain, the existing 3 cm tolerance, bounded flat-lake alignment,
+  ocean rejection, observed steep shoreline, excessive correction, non-flat and
+  water-crossing samples, NaN and infinity. Eleven Python tests passed, including
+  wide/narrow lake launch clearance, water-probe containment, unchanged lake
+  elevation, explicit Y/N/EOF behavior, unknown lakes and island holes.
+- UE 5.8.2 rebuild passed. Real UE offline rendering reached
+  ROW_GEOGRAPHY_READY, completed synthetic calibration and travelled 91.52 m
+  before the screenshot at 55 s. Visual inspection found no overhead mesh and
+  the rowing dashboard was active. The screenshot capture itself caused a later
+  frame-gap pause; this diagnostic used synthetic tracking and no VR/hardware.
+  It exited normally. The user's failed pre-start instance was closed normally
+  before rebuild; no live ride was stopped.
+- Evidence is ignored: logs/row/moraine-before-fix.local.log,
+  moraine-native-tests.log, moraine-ue-build.log, moraine-terrain-aligned.log,
+  cache/row/terrain-diagnostic, and apps/row/artifacts/moraine-terrain-aligned.png.
+  The alignment is a bounded Row display compromise, not surveyed terrain
+  correction; distant terrain/shoreline accuracy remains unverified. The later
+  initial live start is recorded above. Fly terrain/altitude were not modified.
+
+## Row WT9011DCL follow-up
+
+- The BLE 5.0 sensor, mounted near-vertically at the handle centre, supplied
+  acceleration, angular velocity and Euler angles at about 9.9 Hz. Pairing alone
+  did not establish a data connection. After waking it, using its advertised
+  random address type resolved connection failures. That type is saved locally.
+- The native C++ IMU-only probe received 211 valid packets over its 30-second
+  connection/listening run, with zero rejected packets and zero connection
+  errors. It initialized no VR client, rower or heart-rate subscription, and
+  exited normally. Only the WIT notification CCCD was written.
+- A complete user-reported ten-cycle capture contained 1,012 samples. Its C++
+  replay counted ten pulls and ended with zero drive. A second pass started
+  the ordinary settle/quiet/two-cycle calibration during its initial stationary
+  interval; calibration completed on two cycles and the model counted the
+  remaining eight pulls. HMD poses and watts were synthetic in these replays.
+  The recording was also used during development; this is not an independent
+  estimate of classification accuracy. Raw data and identity are ignored logs.
+- MSVC native suite passed 262 checks: existing core 104, water 46, audio 16,
+  tracking 42, and IMU 54. IMU checks cover signed decoding, gravity compensation
+  for near-vertical mounting and pure rotation, quiet/bias gating, duplicate and
+  stale samples, ten-cycle 10 Hz input with 100 Hz rendering, two-cycle setup,
+  timeout, loss/reconnection, HMD yaw versus lateral steering, and pause.
+  Velocity damping was tuned to avoid counting braking at the end of a smooth
+  synthetic stroke train as an extra pull; the real recording still counts ten.
+- UE 5.8.2 Row rebuild passed. Existing UE SetupEnter automation passed with
+  repeated Enter, stop/retry and instrument attachment. Ten Row Python tests
+  passed, including Y/N/EOF launch behavior and unknown-lake rejection.
+- Evidence: logs/row/imu-native-tests.log, imu-replay-result.local.log,
+  imu-ue-build.log, and setup-controls-20260912-131733.log. Diagnostics did not
+  use the normal training log. No place launcher or live VR ride was started.
+
+Local Row input is now selected as `wt9011dcl`; the old Tracker serial remains
+available if explicitly switching back. Tracker-mode calibration is preserved.
+IMU-mode setup explicitly latches averaged forward-facing HMD yaw because AHRS
+coordinates do not identify SteamVR room orientation. Initial live setup/start
+was subsequently confirmed above. Steering comfort, propulsion/audio timing,
+slow/short pulls, mounting movement and long-session drift still need evaluation.
+See [ROW_IMU.ja.md](ROW_IMU.ja.md).
+
 ## Movement magnification follow-up
 
 `fly.ps1 -mag 1..10` was added after the user's first live Fuji ride. It scales

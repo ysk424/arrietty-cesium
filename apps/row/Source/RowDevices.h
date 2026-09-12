@@ -1,17 +1,21 @@
 #pragma once
 #include "RowCore.h"
+#include "RowImu.h"
 #include <memory>
 #include <string>
 
 namespace row {
 struct DeviceConfig {
     std::string trackerSerial;
-    uint64_t rowerAddress=0,heartAddress=0;
+    uint64_t rowerAddress=0,heartAddress=0,imuAddress=0;
+    bool enableVr=true;
+    int imuAddressType=-1; // 0 public, 1 random, -1 requires advertisement.
     // UE shares SteamVR with OpenXR. Release our runtime only after HMD teardown.
     bool deferVrShutdown=false;
 };
 struct DeviceSnapshot {
     Pose bar,head;
+    ImuSample imu;
     Telemetry telemetry;
     Field heart;
     bool vrReady=false,rowerConnected=false,heartConnected=false;
@@ -19,6 +23,11 @@ struct DeviceSnapshot {
     unsigned heartPackets=0;
     int32_t rowerLastError=0,heartLastError=0;
     int rowerStage=0,heartStage=0;
+    bool imuConnected=false;
+    unsigned imuErrors=0,imuRejected=0;
+    int32_t imuLastError=0;
+    int imuStage=0;
+    int imuAddressType=-1,imuGattStatus=-1;
 };
 // OpenVR poses and Windows GATT run independently of the UE game/render thread.
 // All callbacks own shared state; teardown revokes handlers before releasing it.

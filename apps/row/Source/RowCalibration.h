@@ -19,11 +19,12 @@ public:
     bool begin(const Input& in) {
         *this=Calibration{};
         if(!Model::tracking(in)) { fail(CalibrationIssue::Tracking); return false; }
+        frame.useImu=in.useImu;
         phase=CalibrationPhase::Settle; return true;
     }
     void tick(const Input& in,double dt) {
         if(phase==CalibrationPhase::Idle || phase==CalibrationPhase::Complete || phase==CalibrationPhase::Failed) return;
-        if(!Model::tracking(in) || !std::isfinite(dt) || dt<=0 || dt>.1) { fail(CalibrationIssue::Tracking); return; }
+        if(!Model::tracking(in) || in.useImu!=frame.useImu || !std::isfinite(dt) || dt<=0 || dt>.1) { fail(CalibrationIssue::Tracking); return; }
         total+=dt;
         if(total>TimeoutSeconds) { fail(CalibrationIssue::Timeout); return; }
         if(phase==CalibrationPhase::Settle) {
@@ -32,6 +33,12 @@ public:
             return;
         }
         if(phase==CalibrationPhase::Center) {
+            if(in.useImu) {
+                const auto a=imuEarthAcceleration(in.imu);
+                if(magnitude(in.imu.angularVelocity)>4 || magnitude(a-quietImu)>.20) { clearCenter(in); return; }
+                if(in.imu.sequence!=lastQuietSequence) { ++quietImuCount; lastQuietSequence=in.imu.sequence; }
+                imuSum=imuSum+a*dt;
+            }
             // Require a continuous quiet second, not the transient keypad reach.
             for(int i=0;i<3;++i) {
                 const double p=i==0?in.head.position.x:i==1?in.head.position.y:in.head.position.z;
@@ -43,15 +50,34 @@ public:
             facingSum.x+=in.head.forward.x*dt; facingSum.y+=in.head.forward.y*dt;
             remaining=std::max(0.,CenterSeconds-centerTime);
             if(remaining==0) {
+                if(in.useImu && quietImuCount<5) { clearCenter(in); return; }
                 const double len=std::hypot(facingSum.x,facingSum.y);
                 if(len/centerTime<.2) { issue=CalibrationIssue::LookForward; clearCenter(in); return; }
                 facing={facingSum.x/len,facingSum.y/len,0};
                 frame.center={centerSum.x/centerTime,centerSum.y/centerTime,centerSum.z/centerTime};
+                if(in.useImu) {
+                    frame.imu.gravity=imuSum*(1./centerTime);
+                    // AHRS axes are not SteamVR axes. Explicitly align by facing
+                    // straight during the quiet second, never by magnetic yaw.
+                    frame.forward=facing;
+                }
                 phase=CalibrationPhase::Axis; issue=CalibrationIssue::None;
             }
             return;
         }
         axisTime+=dt;
+        if(in.useImu) {
+            if(!imuSamples.empty() && in.imu.sequence==imuSamples.back().sequence) return;
+            if(!imuSamples.empty() && (in.imu.received-imuSamples.back().received>=.25 ||
+                in.imu.sequence<imuSamples.back().sequence)) { fail(CalibrationIssue::Tracking); return; }
+            imuSamples.push_back(in.imu);
+            if(axisTime-nextFit>=.2) {
+                nextFit=axisTime;
+                frame.imu=fitImu(imuSamples,frame.imu.gravity,strokes);
+                if(frame.imu.valid && axisTime>=4) { frame.valid=true; phase=CalibrationPhase::Complete; }
+            }
+            return;
+        }
         // Keep distinct, bounded-rate samples even if the render loop runs fast.
         if(!samples.empty() && in.bar.received-lastSample<1./120.) return;
         if(!samples.empty()) {
@@ -66,10 +92,15 @@ private:
     double low[3]{},high[3]{};
     Vec3 centerSum,facingSum,facing;
     std::vector<Vec3> samples;
+    std::vector<ImuSample> imuSamples;
+    ImuVector quietImu,imuSum;
+    uint64_t lastQuietSequence=0;
+    unsigned quietImuCount=0;
     void fail(CalibrationIssue reason) { phase=CalibrationPhase::Failed; issue=reason; frame.valid=false; }
     void clearCenter(const Input& in) {
         centerTime=0; centerSum=facingSum={}; remaining=CenterSeconds;
         low[0]=high[0]=in.head.position.x; low[1]=high[1]=in.head.position.y; low[2]=high[2]=in.head.position.z;
+        quietImu=imuEarthAcceleration(in.imu); imuSum={}; quietImuCount=0; lastQuietSequence=in.imu.sequence;
     }
     void fitAxis() {
         if(samples.size()<30) return;

@@ -1,5 +1,54 @@
 # Current handoff — 2026-09-12
 
+Row acceptance update: after the OpenVR path fix, the user reported successful
+operation and requested documentation and push. The subsequent normal launch
+logged OpenVR available=1, geography ready, calibration and rowing start. This
+confirms recovery from the two startup blockers and initial live setup/start.
+It does not establish long-session IMU accuracy, slow/short-stroke detection or
+steering/audio comfort. Native tests: 275; Python tests: 11; UE build and
+SetupEnter passed. Private settings, device identities and session data stay local.
+
+Row OpenVR follow-up: the SDK was present with pinned hashes, but the module's
+development DLL fallback still traversed six parents from ProjectDir after the
+app move. It now traverses four to workspace/ThirdParty/OpenVR. The failed live
+launch had available=0 and had not started; it was closed normally before rebuild.
+UE now reports ROW_OPENVR_LIBRARY available=1. The initial offline test verified
+DLL loading; the later user confirmation is recorded above. SDK reinstallation
+was not required.
+
+Row Moraine Lake follow-up: the user's normal launch passed Y but stopped before
+calibration with water_below_terrain, showing terrain overhead. The original
+40 m shore-clearance probes were 26.90–36.00 m above the established lake water.
+Twenty independent most-detailed diagnostic samples showed flat interior terrain
+about 35.98 m high relative to that water; merely moving offshore was insufficient.
+Row now prefers 150 m lake clearance (40 m fallback for narrow lakes) and applies
+a bounded terrain display/collision translation only to a flat elevated lake
+sheet: five valid probes, all >3 cm, spread <=25 cm, excess <=50 m. Water remains
+at its independently established MSL/EGM96 height and local mean Z=0. Ocean and
+inconsistent/unknown terrain gates remain. See INTEGRATION and VALIDATION.
+The failed, never-started Row instance was closed normally before rebuilding.
+UE offline Moraine preview passed geography readiness and travelled 91.52 m;
+the overhead mesh was absent. That preview alone was not live VR/IMU acceptance
+or surveyed shoreline accuracy. Normal row.ps1 place launches still require Y.
+
+Row follow-up: WT9011DCL replaces the occluded handle Tracker in this PC's
+ignored local settings (`bar_input=wt9011dcl`). Native BLE notifications only;
+use the observed random address type on reconnect. Sensor wake button was needed.
+Raw data and identities stay under logs/row. See [ROW_IMU.ja.md](ROW_IMU.ja.md).
+The IMU measures acceleration/attitude, not room position. Its setup preserves
+2 s settle / 1 s quiet / 2 cycles, but explicitly uses forward-facing HMD yaw
+during the quiet second for the fixed steering frame. Start with the handle
+extended and pull first. Tracker-mode machine-line calibration is unchanged.
+HMD lateral steering and Enter/numpad-0 remain. IMU gaps >=.25 s stop immediately;
+there is no HMD handle fallback or automatic restart. Sensor and rower commands
+remain read-only apart from notification subscription.
+Native reception and a user-reported 10-cycle recording passed; C++ replay
+counts 10, and online calibration on its first two cycles leaves 8 exercise
+pulls. This is development/replay evidence, not independent accuracy or VR
+acceptance; the later initial live setup/start is recorded above. Longer sessions
+and detailed rowing feel still need evaluation. The capture/probe diagnostics
+did not run a place launcher.
+
 Follow-up: a live Fuji air-start ride confirmed movement and descent; AGL
 increased over falling terrain. Detailed session observations remain local in
 logs/fly/handoff.local.md. This does not establish collision acceptance.
@@ -23,8 +72,8 @@ were changed. Private row/fly device settings were copied/moved into config/.
 Original row session records and local caches were retained and their scene paths
 updated. The application no longer needs Blender or Secret-World to build/run.
 
-Row's sea/lake restrictions, telemetry-only rower, calibration, water and audio
-are unchanged. Fly retains T2 controls, fan/PTT, handle steering, view-forward
+Row's sea/lake restrictions, telemetry-only rower, Tracker calibration, water and audio
+are preserved; the optional IMU calibration is described above. Fly retains T2 controls, fan/PTT, handle steering, view-forward
 Button 1 and R alignment. Do not apply rowing device restrictions to the T2.
 
 Fly uses sampled ground ellipsoid height as origin. Altitude is h-h0 internally,

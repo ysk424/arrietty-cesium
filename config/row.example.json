@@ -1,4 +1,7 @@
 {
+  "bar_input": "tracker",
+  "imu_address": "",
+  "imu_address_type": "",
   "tracker_serial": "",
   "rower_address": "",
   "heart_rate_address": ""

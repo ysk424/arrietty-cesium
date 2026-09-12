@@ -7,9 +7,10 @@
 #include <cstddef>
 
 namespace row {
-enum class BarSource { Tracker, HmdAssist, Coast, Reacquiring };
+enum class BarSource { Tracker, HmdAssist, Coast, Reacquiring, Imu };
 inline const char* barSourceName(BarSource source) {
     switch(source) {
+    case BarSource::Imu: return "imu_velocity";
     case BarSource::HmdAssist: return "hmd_assist";
     case BarSource::Coast: return "coast";
     case BarSource::Reacquiring: return "reacquiring";

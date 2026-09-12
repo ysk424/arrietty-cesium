@@ -31,7 +31,11 @@ def private_values():
         path = ROOT / filename
         if path.exists():
             config = json.loads(path.read_text(encoding='utf-8-sig'))
-            values.extend(v for v in config.values() if isinstance(v, str) and len(v) > 6)
+            # Known input-mode names are public protocol choices, not device IDs.
+            # Keep addresses, serials, tokens and unknown setting values protected.
+            values.extend(v for key, v in config.items()
+                          if isinstance(v, str) and len(v) > 6
+                          and not (key == 'bar_input' and v in {'tracker', 'wt9011dcl'}))
     values.extend(os.environ.get(name, '') for name in ('OPENAI_API_KEY', 'CESIUM_ION_TOKEN'))
     return [v.casefold() for v in values if v]
 

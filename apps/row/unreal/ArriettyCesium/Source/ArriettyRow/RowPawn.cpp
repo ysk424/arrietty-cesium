@@ -115,6 +115,17 @@ void ARowPawn::BeginPlay() {
             FString serial,address; cfg->TryGetStringField(TEXT("tracker_serial"),serial); dc.trackerSerial=TCHAR_TO_UTF8(*serial);
             auto readAddress=[&](const TCHAR* key) { FString a; cfg->TryGetStringField(key,a); a.ReplaceInline(TEXT(":"),TEXT("")); a.ReplaceInline(TEXT("-"),TEXT("")); return FCString::Strtoui64(*a,nullptr,16); };
             dc.rowerAddress=readAddress(TEXT("rower_address")); dc.heartAddress=readAddress(TEXT("heart_rate_address"));
+            FString barInput; cfg->TryGetStringField(TEXT("bar_input"),barInput);
+            UseImu=barInput==TEXT("wt9011dcl");
+            if(UseImu) {
+                dc.imuAddress=readAddress(TEXT("imu_address")); dc.trackerSerial.clear();
+                FString type; cfg->TryGetStringField(TEXT("imu_address_type"),type);
+                dc.imuAddressType=type==TEXT("random")?1:type==TEXT("public")?0:-1;
+            }
+            else if(!barInput.IsEmpty() && barInput!=TEXT("tracker")) {
+                // An unknown selection must not silently choose another sensor.
+                dc.trackerSerial.clear(); Notice=TEXT("Unknown bar_input in local settings");
+            }
         } else Notice=TEXT("Local device settings missing");
         if(RowDeviceApiAvailable()) Devices=std::make_unique<row::Devices>(dc);
         else Notice=TEXT("OpenVR SDK missing / run bootstrap");
@@ -141,6 +152,7 @@ void ARowPawn::SetupPlayerInputComponent(UInputComponent* input) {
 }
 row::Input ARowPawn::ReadInput() const {
     row::Input in; in.now=row::Devices::seconds(); in.bar=Snapshot.bar; in.head=Snapshot.head; in.telemetry=Snapshot.telemetry;
+    in.useImu=UseImu && !Offline; in.imu=Snapshot.imu;
     if(Offline) {
         const bool calibrating=Model.state==row::State::Calibrating;
         const double phase=std::fmod(calibrating?CalibrationMotionTime:SimTime,2.8);
@@ -182,7 +194,7 @@ void ARowPawn::Toggle() {
     const auto in=ReadInput();
     if(!Calibration.begin(in)) {
         Notice=TEXT("Enter received / check HMD + bar");
-        UE_LOG(LogTemp,Display,TEXT("ROW_CONTROL action=start_blocked head_valid=%d bar_valid=%d"),in.head.valid,in.bar.valid);
+        UE_LOG(LogTemp,Display,TEXT("ROW_CONTROL action=start_blocked head_valid=%d bar_valid=%d imu=%d"),in.head.valid,row::Model::barTracked(in),UseImu);
         return;
     }
     Model.calibrate(); CalibrationMotionTime=0; Notice.Empty(); Record(TEXT("calibration_begin"));
@@ -324,7 +336,8 @@ void ARowPawn::Tick(float dt) {
         Panel->Speed=FString::Printf(TEXT("%.1f"),Model.speed*3.6);
         const auto hr=Snapshot.heart;
         Panel->Heart=hr.fresh(in.now,5) && hr.value>0?FString::Printf(TEXT("%.0f"),hr.value):TEXT("--");
-        const TCHAR* rowing=Model.barTracking.source==row::BarSource::HmdAssist?TEXT("ROWING / HMD ASSIST"):
+        const TCHAR* rowing=Model.barTracking.source==row::BarSource::Imu?TEXT("ROWING / WIT IMU"):
+            Model.barTracking.source==row::BarSource::HmdAssist?TEXT("ROWING / HMD ASSIST"):
             Model.barTracking.source==row::BarSource::Coast?TEXT("BAR LOST / COASTING"):
             Model.barTracking.source==row::BarSource::Reacquiring?TEXT("BAR RETURNING / COASTING"):TEXT("ROWING");
         const TCHAR* state=Model.state==row::State::Running?rowing:Model.state==row::State::Paused?TEXT("PAUSED"):
@@ -336,26 +349,29 @@ void ARowPawn::Tick(float dt) {
         if(Model.state==row::State::Calibrating) {
             if(Calibration.phase==row::CalibrationPhase::Settle) {
                 Panel->Status=FString::Printf(TEXT("1/3  GET READY  %.1f s"),Calibration.remaining);
-                Panel->Guide=TEXT("Release the keypad. Sit in your normal centered rowing posture.");
+                Panel->Guide=UseImu?TEXT("Face straight along the machine. Extend the bar and hold it still."):
+                    TEXT("Release the keypad. Sit in your normal centered rowing posture.");
             } else if(Calibration.phase==row::CalibrationPhase::Center) {
                 Panel->Status=FString::Printf(TEXT("2/3  HOLD STILL  %.1f s"),Calibration.remaining);
-                Panel->Guide=TEXT("Face the machine and hold your normal posture for one quiet second.");
+                Panel->Guide=UseImu?TEXT("Keep facing straight: this sets steering center. Hold head and bar still."):
+                    TEXT("Face the machine and hold your normal posture for one quiet second.");
             } else {
                 Panel->Status=FString::Printf(TEXT("3/3  ROW THE BAR  %u / 2"),Calibration.strokes);
                 Panel->Guide=Calibration.issue==row::CalibrationIssue::LookForward?TEXT("Face along the machine. NUM 0 then NUM ENTER to retry."):
                     Calibration.issue==row::CalibrationIssue::KeepStraight?TEXT("Move the bar straight. NUM 0 then NUM ENTER to retry."):
+                    UseImu?TEXT("Pull the extended bar toward you, then return. Twice. NUM 0 cancels."):
                     TEXT("ENTER received. Move the bar out and back twice. Starts automatically. NUM 0 cancels.");
             }
         }
         const bool estimateAvailable=Model.state==row::State::Running &&
-            (Model.barTracking.source==row::BarSource::Tracker || Model.barTracking.source==row::BarSource::HmdAssist);
+            (Model.barTracking.source==row::BarSource::Tracker || Model.barTracking.source==row::BarSource::HmdAssist || Model.barTracking.source==row::BarSource::Imu);
         const auto output=row::samplePower(in.telemetry,in.now,estimateAvailable?Model.barVelocity:0.);
         const bool powerAvailable=output.usingBt || estimateAvailable;
         const FString watts=powerAvailable?FString::Printf(TEXT("%.0f"),output.usingBt?output.machineWatts:output.baseWatts):TEXT("--");
         const FString load=output.resistance>=1?FString::Printf(TEXT("%.0f"),output.resistance):TEXT("-- (x1)");
         const FString game=powerAvailable?FString::Printf(TEXT("%.0f"),output.gameWatts):TEXT("--");
         Panel->Detail=FString::Printf(TEXT("%s %s W  |  LOAD %s  |  GAME %s W  |  %u strokes"),
-            output.usingBt?TEXT("BT"):Model.barTracking.source==row::BarSource::HmdAssist?TEXT("HMD est"):TEXT("Tracker est"),*watts,*load,*game,Model.strokes);
+            output.usingBt?TEXT("BT"):UseImu?TEXT("IMU est"):Model.barTracking.source==row::BarSource::HmdAssist?TEXT("HMD est"):TEXT("Tracker est"),*watts,*load,*game,Model.strokes);
     }
     if(!SessionFile.IsEmpty() && in.now>=NextRecord) { Record(TEXT("sample")); NextRecord=in.now+1; }
     const bool captureAssist=Offline && Demo && FParse::Param(FCommandLine::Get(),TEXT("RowCaptureAssist")) &&
@@ -370,7 +386,7 @@ void ARowPawn::Record(const TCHAR* event) {
     if(SessionFile.IsEmpty()) return;
     const auto in=ReadInput(); const double now=in.now; const auto& t=in.telemetry;
     const bool estimateAvailable=Model.state==row::State::Running &&
-        (Model.barTracking.source==row::BarSource::Tracker || Model.barTracking.source==row::BarSource::HmdAssist);
+        (Model.barTracking.source==row::BarSource::Tracker || Model.barTracking.source==row::BarSource::HmdAssist || Model.barTracking.source==row::BarSource::Imu);
     const auto output=row::samplePower(t,now,estimateAvailable?Model.barVelocity:0.);
     auto value=[&](const row::Field& f,double scale=1.) { return f.fresh(now,5) && f.value>=0?FString::Printf(TEXT("%.3f"),f.value*scale):FString(); };
     const FString hr=Snapshot.heart.value>0?value(Snapshot.heart):FString();
@@ -380,7 +396,7 @@ void ARowPawn::Record(const TCHAR* event) {
     const FString machinePower=output.usingBt?FString::Printf(TEXT("%.3f"),output.machineWatts):FString();
     const FString line=FString::Printf(TEXT("%s,%s,%.3f,%.3f,%.3f,%s,%u,%s,%s,%s,%s,%s,%.2f,%.3f,%.3f,%s,%.0f,%s,%s,%.3f,%s\n"),
         *FDateTime::UtcNow().ToIso8601(),event,Model.elapsed,Model.distance,Model.speed*3.6,*hr,Model.strokes,
-        Demo?TEXT("demo"):output.usingBt?TEXT("bt"):Model.barTracking.source==row::BarSource::HmdAssist?TEXT("hmd_estimate"):TEXT("tracker_estimate"),*value(t.distance),*value(t.elapsed),*speed,*machinePower,
+        Demo?TEXT("demo"):output.usingBt?TEXT("bt"):UseImu?TEXT("imu_estimate"):Model.barTracking.source==row::BarSource::HmdAssist?TEXT("hmd_estimate"):TEXT("tracker_estimate"),*value(t.distance),*value(t.elapsed),*speed,*machinePower,
         Model.lean*100,Model.steer,FMath::RadiansToDegrees(Model.yawRate),*resistance,output.multiplier,*game,
         UTF8_TO_TCHAR(row::barSourceName(Model.barTracking.source)),Model.barTracking.gapSeconds,
         UTF8_TO_TCHAR(row::trackingIssueName(Model.barTracking.issue)));
@@ -392,6 +408,8 @@ void ARowPawn::EndPlay(const EEndPlayReason::Type reason) {
     Record(TEXT("exit"));
     if(Devices) UE_LOG(LogTemp,Display,TEXT("ROW_DEVICE_SUMMARY tracker_frames=%llu rower_packets=%u heart_packets=%u rejected=%u"),
         ValidBarFrames,Snapshot.telemetry.packets,Snapshot.heartPackets,Snapshot.telemetry.rejected);
+    if(Devices && UseImu) UE_LOG(LogTemp,Display,TEXT("ROW_IMU_SUMMARY packets=%llu rejected=%u errors=%u"),
+        Snapshot.imu.sequence,Snapshot.imuRejected,Snapshot.imuErrors);
     Devices.reset(); Super::EndPlay(reason);
 }
 void ARowPawn::BuildBoat() {

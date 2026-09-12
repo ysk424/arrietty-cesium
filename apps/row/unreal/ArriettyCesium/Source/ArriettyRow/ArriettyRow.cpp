@@ -10,7 +10,7 @@ public:
     virtual void StartupModule() override {
         const FString candidates[]{FString(FPlatformProcess::BaseDir())/TEXT("openvr_api.dll"),
             FPaths::ProjectDir()/TEXT("Binaries/Win64/openvr_api.dll"),
-            FPaths::ProjectDir()/TEXT("../../../../../../ThirdParty/OpenVR/bin/win64/openvr_api.dll")};
+            FPaths::ProjectDir()/TEXT("../../../../ThirdParty/OpenVR/bin/win64/openvr_api.dll")};
         for(const auto& path:candidates) if(FPaths::FileExists(path)) {
             OpenVRHandle=FPlatformProcess::GetDllHandle(*FPaths::ConvertRelativePathToFull(path));
             if(OpenVRHandle) break;

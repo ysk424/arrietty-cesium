@@ -52,6 +52,7 @@ private:
     FTransform Home;
     FString SessionFile,Notice;
     bool Offline=false,Demo=false,DemoStarted=false;
+    bool UseImu=false;
     bool Chase=false;
     double Began=0,NextRecord=0,SimTime=0,QuitAfter=0;
     double CalibrationMotionTime=0;

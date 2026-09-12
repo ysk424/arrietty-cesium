@@ -1,4 +1,5 @@
 #include "RowGeography.h"
+#include "RowTerrain.h"
 #include "ArriettyCesium.h"
 #include "Cesium3DTileset.h"
 #include "CesiumGeoreference.h"
@@ -129,16 +130,24 @@ void ARowGeography::BeginPlay() {
 void ARowGeography::HeightsSampled(ACesium3DTileset*,const TArray<FCesiumSampleHeightResult>& Results,const TArray<FString>&) {
     if(Failed) return;
     if(Results.Num()!=Probes.Num()) { Fail(TEXT("height_count"),TEXT("Terrain unavailable / restart when online")); return; }
-    double maxAbove=-1.e9,minAbove=1.e9;
+    std::array<double,5> deltas{};
     for(int i=0;i<Results.Num();++i) {
         if(!Results[i].SampleSuccess) { Fail(TEXT("height_unavailable"),TEXT("Terrain unavailable / restart when online")); return; }
         const double delta=Results[i].LongitudeLatitudeHeight.Z-Probes[i].Z;
         if(!FMath::IsFinite(delta)) { Fail(TEXT("height_invalid"),TEXT("Terrain height unavailable")); return; }
-        maxAbove=FMath::Max(maxAbove,delta); minAbove=FMath::Min(minAbove,delta);
+        deltas[i]=delta;
     }
-    UE_LOG(LogTemp,Display,TEXT("ROW_TERRAIN_WATER_CHECK min_delta_m=%.3f max_delta_m=%.3f"),minAbove,maxAbove);
-    // A terrain sample verifies the launch point; it never substitutes for lake surface elevation.
-    if(maxAbove>.03) { Fail(TEXT("water_below_terrain"),TEXT("Water/terrain mismatch / check -WaterLevelM")); return; }
+    const auto alignment=row::alignLakeTerrain(deltas,Ocean);
+    UE_LOG(LogTemp,Display,TEXT("ROW_TERRAIN_WATER_CHECK min_delta_m=%.3f max_delta_m=%.3f"),alignment.minDeltaM,alignment.maxDeltaM);
+    if(alignment.status==row::WaterTerrainStatus::AlignLake) {
+        // Move this Row tileset's rendering AND physics together, not the known
+        // lake height, georeference, water, HMD or any flight coordinates.
+        Terrain->AddActorWorldOffset(FVector(0,0,alignment.offsetM*100));
+        UE_LOG(LogTemp,Display,TEXT("ROW_LAKE_TERRAIN_ALIGNMENT offset_m=%.3f spread_m=%.3f water_datum_unchanged=1"),
+            alignment.offsetM,alignment.maxDeltaM-alignment.minDeltaM);
+    } else if(alignment.status!=row::WaterTerrainStatus::Ready) {
+        Fail(TEXT("water_below_terrain"),TEXT("Water/terrain mismatch / check place data")); return;
+    }
     HeightChecked=true;
 }
 void ARowGeography::Tick(float dt) {

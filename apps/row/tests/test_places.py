@@ -107,6 +107,26 @@ class PlaceTests(unittest.TestCase):
             self.assertLess(scene['surface_coefficients'][2],0)
             self.assertLess(scene['surface_coefficients'][4],0)
 
+    def test_lake_spawn_avoids_shore_slope_and_retains_narrow_lakes(self):
+        from shapely.geometry import Polygon,Point
+        from shapely.ops import transform
+        from pyproj import Transformer
+        for half_width,minimum_clearance in ((.004,149),(.0008,39)):
+            lake=Polygon([(-half_width,-.008),(half_width,-.008),(half_width,.008),(-half_width,.008)])
+            place={'water_type':'lake','latitude':0,'longitude':0,'launch_latitude':0,'launch_longitude':half_width,
+                   'name':'Fixture lake','country':'Fixture','water_level_msl_m':1884,'elevation_source':'https://example.com/lake',
+                   'search_sources':['https://example.com/lake']}
+            with tempfile.TemporaryDirectory() as folder, patch.object(places,'CACHE',Path(folder)), \
+                 patch.object(places,'lake_geometry',return_value=(lake,'fixture')):
+                _,scene=places.build_scene(place)
+                project=Transformer.from_crs('EPSG:4326','+proj=aeqd +lat_0=0 +lon_0=0 +datum=WGS84 +units=m',always_xy=True)
+                shore=transform(project.transform,lake).boundary
+                origin=Point(project.transform(scene['origin_longitude'],scene['origin_latitude']))
+                self.assertGreaterEqual(origin.distance(shore),minimum_clearance)
+                self.assertEqual(scene['water_height_msl_m'],1884)
+                for lon,lat,_ in scene['height_probes']:
+                    self.assertTrue(lake.covers(Point(lon,lat)))
+
 
 if __name__=='__main__':
     unittest.main()

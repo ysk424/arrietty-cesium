@@ -26,7 +26,7 @@ using namespace Windows::Storage::Streams;
 using namespace std::chrono_literals;
 double Devices::seconds() { return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
 struct Shared { mutable std::mutex mutex; DeviceSnapshot data; std::atomic<bool> stop=false; };
-static guid uuid(uint32_t shortId) { return {shortId,0,0x1000,{0x80,0,0,0x80,0x5f,0x9b,0x34,0xfb}}; }
+static guid uuid(uint32_t shortId,bool wit=false) { return {shortId,0,0x1000,{0x80,0,0,0x80,0x5f,uint8_t(wit?0x9a:0x9b),0x34,0xfb}}; }
 // WinRT calls have bounded waits and cooperative cancellation, including connect.
 template<class Async> auto waitFor(Async op,const std::shared_ptr<Shared>& s) {
     const double deadline=Devices::seconds()+12;
@@ -36,15 +36,21 @@ template<class Async> auto waitFor(Async op,const std::shared_ptr<Shared>& s) {
     }
     return op.GetResults();
 }
-static void bleLoop(std::shared_ptr<Shared> s,uint64_t address,bool heart) {
+enum class BleRole { Rower, Heart, Imu };
+static void bleLoop(std::shared_ptr<Shared> s,uint64_t address,BleRole role,int configuredAddressType=-1) {
     if(!address) return; // Selection is explicit in ignored local settings.
+    const bool heart=role==BleRole::Heart,imu=role==BleRole::Imu;
+    auto& connection=imu?s->data.imuConnected:heart?s->data.heartConnected:s->data.rowerConnected;
+    auto& deviceStage=imu?s->data.imuStage:heart?s->data.heartStage:s->data.rowerStage;
+    auto& errors=imu?s->data.imuErrors:heart?s->data.heartErrors:s->data.rowerErrors;
+    auto& lastError=imu?s->data.imuLastError:heart?s->data.heartLastError:s->data.rowerLastError;
     init_apartment(apartment_type::multi_threaded);
     while(!s->stop) {
         BluetoothLEDevice device{nullptr}; GattDeviceService service{nullptr};
         GattSession session{nullptr};
         GattCharacteristic characteristic{nullptr}; event_token token{}; bool registered=false;
         try {
-            auto stage=[&](int v) { std::lock_guard lock(s->mutex); (heart?s->data.heartStage:s->data.rowerStage)=v; };
+            auto stage=[&](int v) { std::lock_guard lock(s->mutex); deviceStage=v; };
             stage(1);
             // A random BLE address needs the advertised address type; assuming
             // Public can yield an unreachable GATT device on Windows.
@@ -59,25 +65,31 @@ static void bleLoop(std::shared_ptr<Shared> s,uint64_t address,bool heart) {
             watcher.Start(); const double scanUntil=Devices::seconds()+5;
             while(!s->stop && advertised->type<0 && Devices::seconds()<scanUntil) std::this_thread::sleep_for(50ms);
             watcher.Stop(); watcher.Received(advertisementToken);
-            const auto addressType=advertised->type<0?BluetoothAddressType::Public:BluetoothAddressType(advertised->type.load());
+            const auto addressType=advertised->type<0?
+                (imu && configuredAddressType==1?BluetoothAddressType::Random:BluetoothAddressType::Public):BluetoothAddressType(advertised->type.load());
+            if(imu && advertised->type<0 && configuredAddressType<0) throw hresult_error(hresult{int32_t(0x80004005u)});
+            if(imu) { std::lock_guard lock(s->mutex); s->data.imuAddressType=int(addressType); }
             device=waitFor(BluetoothLEDevice::FromBluetoothAddressAsync(address,addressType),s);
             if(!device) throw hresult_error(hresult{int32_t(0x80004005u)});
             session=waitFor(GattSession::FromDeviceIdAsync(device.BluetoothDeviceId()),s);
             if(session && session.CanMaintainConnection()) session.MaintainConnection(true);
             stage(2);
-            auto services=waitFor(device.GetGattServicesForUuidAsync(uuid(heart?0x180d:0x1826),BluetoothCacheMode::Uncached),s);
+            auto services=waitFor(device.GetGattServicesForUuidAsync(uuid(imu?0xffe5:heart?0x180d:0x1826,imu),BluetoothCacheMode::Uncached),s);
+            if(imu) { std::lock_guard lock(s->mutex); s->data.imuGattStatus=int(services.Status()); }
             if(services.Status()!=GattCommunicationStatus::Success || services.Services().Size()==0) throw hresult_error(hresult{int32_t(0x80004005u)});
             service=services.Services().GetAt(0);
             stage(3);
-            auto chars=waitFor(service.GetCharacteristicsForUuidAsync(uuid(heart?0x2a37:0x2ad1),BluetoothCacheMode::Uncached),s);
+            auto chars=waitFor(service.GetCharacteristicsForUuidAsync(uuid(imu?0xffe4:heart?0x2a37:0x2ad1,imu),BluetoothCacheMode::Uncached),s);
             if(chars.Status()!=GattCommunicationStatus::Success || chars.Characteristics().Size()==0) throw hresult_error(hresult{int32_t(0x80004005u)});
             characteristic=chars.Characteristics().GetAt(0);
-            token=characteristic.ValueChanged([s,heart](const auto&,const GattValueChangedEventArgs& args) {
+            token=characteristic.ValueChanged([s,heart,imu](const auto&,const GattValueChangedEventArgs& args) {
                 try {
                     auto reader=DataReader::FromBuffer(args.CharacteristicValue());
                     std::vector<uint8_t> bytes(reader.UnconsumedBufferLength()); reader.ReadBytes(bytes);
                     const double now=Devices::seconds(); std::lock_guard lock(s->mutex);
-                    if(heart) {
+                    if(imu) {
+                        if(!parseImu(bytes.data(),bytes.size(),now,s->data.imu)) ++s->data.imuRejected;
+                    } else if(heart) {
                         ++s->data.heartPackets;
                         auto bpm=parseHeart(bytes.data(),bytes.size());
                         s->data.heart.set(bpm?double(*bpm):-1,now);
@@ -88,25 +100,24 @@ static void bleLoop(std::shared_ptr<Shared> s,uint64_t address,bool heart) {
             const auto status=waitFor(characteristic.WriteClientCharacteristicConfigurationDescriptorAsync(
                 GattClientCharacteristicConfigurationDescriptorValue::Notify),s);
             if(status!=GattCommunicationStatus::Success) throw hresult_error(hresult{int32_t(0x80004005u)});
-            { std::lock_guard lock(s->mutex); (heart?s->data.heartConnected:s->data.rowerConnected)=true; (heart?s->data.heartStage:s->data.rowerStage)=5; }
+            { std::lock_guard lock(s->mutex); connection=true; deviceStage=5; }
             const double connectedAt=Devices::seconds();
             while(!s->stop) {
                 // Recover from silent notification loss as well as disconnects.
-                double latest; { std::lock_guard lock(s->mutex); latest=heart?s->data.heart.received:
+                double latest; { std::lock_guard lock(s->mutex); latest=imu?s->data.imu.received:heart?s->data.heart.received:
                     std::max(s->data.telemetry.strokeRate.received,s->data.telemetry.power.received); }
                 if(Devices::seconds()-std::max(latest,connectedAt)>15) break;
                 if(Devices::seconds()-connectedAt>5 && device.ConnectionStatus()==BluetoothConnectionStatus::Disconnected) break;
                 std::this_thread::sleep_for(100ms);
             }
-        } catch(const hresult_error& e) { std::lock_guard lock(s->mutex); ++(heart?s->data.heartErrors:s->data.rowerErrors);
-            (heart?s->data.heartLastError:s->data.rowerLastError)=e.code().value; }
-        catch(...) { std::lock_guard lock(s->mutex); ++(heart?s->data.heartErrors:s->data.rowerErrors); }
+        } catch(const hresult_error& e) { std::lock_guard lock(s->mutex); ++errors; lastError=e.code().value; }
+        catch(...) { std::lock_guard lock(s->mutex); ++errors; }
         if(registered) try { characteristic.ValueChanged(token); } catch(...) {}
         // Closing the GATT service releases this client's subscription.
         if(service) try { service.Close(); } catch(...) {}
         if(session) try { session.MaintainConnection(false); session.Close(); } catch(...) {}
         if(device) try { device.Close(); } catch(...) {}
-        { std::lock_guard lock(s->mutex); (heart?s->data.heartConnected:s->data.rowerConnected)=false; }
+        { std::lock_guard lock(s->mutex); connection=false; if(imu) s->data.imu.valid=false; }
         for(int i=0;i<30 && !s->stop;++i) std::this_thread::sleep_for(100ms);
     }
     uninit_apartment();
@@ -165,9 +176,12 @@ static void vrLoop(std::shared_ptr<Shared> s,std::string serial,bool deferShutdo
 }
 struct Devices::Impl {
     std::shared_ptr<Shared> shared=std::make_shared<Shared>();
-    std::thread vr,ble,hr;
-    explicit Impl(DeviceConfig c):vr(vrLoop,shared,c.trackerSerial,c.deferVrShutdown),ble(bleLoop,shared,c.rowerAddress,false),hr(bleLoop,shared,c.heartAddress,true) {}
-    ~Impl() { shared->stop=true; vr.join(); ble.join(); hr.join(); }
+    std::thread vr,ble,hr,imu;
+    explicit Impl(DeviceConfig c):
+        vr([s=shared,c] { if(c.enableVr) vrLoop(s,c.trackerSerial,c.deferVrShutdown); }),
+        ble(bleLoop,shared,c.rowerAddress,BleRole::Rower,-1),hr(bleLoop,shared,c.heartAddress,BleRole::Heart,-1),
+        imu(bleLoop,shared,c.imuAddress,BleRole::Imu,c.imuAddressType) {}
+    ~Impl() { shared->stop=true; vr.join(); ble.join(); hr.join(); imu.join(); }
 };
 Devices::Devices(DeviceConfig c):impl(std::make_unique<Impl>(c)) {}
 Devices::~Devices()=default;

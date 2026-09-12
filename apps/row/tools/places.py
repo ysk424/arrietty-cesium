@@ -229,7 +229,11 @@ def build_scene(place, *, radius_km=3, water_level=None):
         water=MultiPolygon([p for p in water.geoms if isinstance(p,Polygon)])
     if water.is_empty:
         raise PlaceError('利用できる水域がありません。')
-    interior=water.buffer(-150 if place['water_type']=='sea' else -40)
+    # Stay clear of DEM shoreline interpolation as well as mapped land. Narrow
+    # lakes retain the original 40 m minimum when no 150 m interior exists.
+    interior=water.buffer(-150)
+    if interior.is_empty and place['water_type']=='lake':
+        interior=water.buffer(-40)
     if interior.is_empty:
         raise PlaceError('ボートを配置する十分な広さの水域がありません。')
     target=Point(proj.transform(place['launch_longitude'],place['launch_latitude']))

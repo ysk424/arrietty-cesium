@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <optional>
 #include "RowTracking.h"
+#include "RowImu.h"
 
 namespace row {
 constexpr double Pi = 3.14159265358979323846;
@@ -81,8 +82,8 @@ inline double dot(Vec3 a,Vec3 b) { return a.x*b.x+a.y*b.y+a.z*b.z; }
 inline bool finite(Vec3 a) { return std::isfinite(a.x)&&std::isfinite(a.y)&&std::isfinite(a.z); }
 struct Pose { Vec3 position,forward{1,0,0}; bool valid=false; double received=-1e9; };
 enum class State { Ready, Running, Paused, TrackingLost, Calibrating };
-struct Input { Pose bar,head; Telemetry telemetry; double now=0; };
-struct SteeringFrame { Vec3 forward{1,0,0},center; bool valid=false; };
+struct Input { Pose bar,head; Telemetry telemetry; double now=0; bool useImu=false; ImuSample imu; };
+struct SteeringFrame { Vec3 forward{1,0,0},center; bool valid=false; bool useImu=false; ImuFit imu; };
 struct Model {
     static constexpr double StraightMargin=.08,FullLean=.20,FullTurnRadius=10.;
     State state=State::Ready;
@@ -94,11 +95,14 @@ struct Model {
     double previousBar=0,extreme=0,pullTravel=0,recoveryTravel=0;
     bool initialized=false,pulling=false,armed=false;
     BarTracking barTracking;
+    bool imuMode=false;
+    ImuMotion imuMotion;
     static bool headTracking(const Input& in) {
         return in.head.valid && finite(in.head.position) && finite(in.head.forward)
             && in.now-in.head.received<.25 && in.now>=in.head.received;
     }
     static bool barTracked(const Input& in) {
+        if(in.useImu) return in.imu.fresh(in.now);
         return in.bar.valid && finite(in.bar.position)
             && in.now-in.bar.received<.25 && in.now>=in.bar.received;
     }
@@ -106,16 +110,19 @@ struct Model {
         return barTracked(in) && headTracking(in);
     }
     bool start(const Input& in,const SteeringFrame& frame) {
-        if(!tracking(in) || !frame.valid || !finite(frame.forward) || !finite(frame.center)) return false;
-        // Only a measured machine axis and averaged neutral may start a session.
-        // The caller supplies world heading separately; gaze never defines steering.
+        if(!tracking(in) || !frame.valid || !finite(frame.forward) || !finite(frame.center) ||
+            frame.useImu!=in.useImu || (in.useImu && !frame.imu.usable())) return false;
+        // Tracker uses its measured machine line. IMU uses the explicit neutral
+        // facing captured during setup, then keeps this frame fixed while rowing.
         auto f=frame.forward; const double len=std::hypot(f.x,f.y);
         if(len<.2) return false;
         forward={f.x/len,f.y/len,0}; right={-forward.y,forward.x,0};
         neutralHead=frame.center;
-        previousBar=dot(in.bar.position,forward);
+        imuMode=in.useImu;
+        previousBar=imuMode?0:dot(in.bar.position,forward);
         barPosition=previousBar; extreme=previousBar;
         barTracking.start(previousBar,dot(in.head.position,forward),in.now);
+        if(imuMode) { imuMotion.start(frame.imu,in.imu); barTracking.source=BarSource::Imu; }
         barVelocity=lean=steer=drive=power=yawRate=0; initialized=true;
         pullTravel=recoveryTravel=0; pulling=false; armed=true; state=State::Running; return true;
     }
@@ -125,19 +132,26 @@ struct Model {
     // <=20ms substeps in caller; long frame gaps stop rather than launch the boat.
     double tick(const Input& in,double dt) {
         if(state!=State::Running) return 0;
-        if(!headTracking(in) || !std::isfinite(dt) || dt<=0 || dt>.1) {
+        if(!headTracking(in) || !std::isfinite(dt) || dt<=0 || dt>.1 || in.useImu!=imuMode) {
             barTracking.issue=!headTracking(in)?TrackingIssue::HeadLost:TrackingIssue::FrameGap;
             state=State::TrackingLost; speed=drive=power=yawRate=0; return 0;
         }
         const auto oldSource=barTracking.source;
         const bool tracked=barTracked(in);
-        if(!barTracking.tick(tracked?dot(in.bar.position,forward):0,tracked,
+        if(imuMode) {
+            if(!imuMotion.tick(in.imu,in.now)) {
+                barTracking.issue=tracked?TrackingIssue::BarJump:TrackingIssue::BarTimeout;
+                state=State::TrackingLost; speed=drive=power=yawRate=0; return 0;
+            }
+            barTracking.source=BarSource::Imu;
+            barTracking.delta=imuMotion.velocity*dt;
+        } else if(!barTracking.tick(tracked?dot(in.bar.position,forward):0,tracked,
             dot(in.head.position,forward),in.now,dt)) {
             state=State::TrackingLost; speed=drive=power=yawRate=0; return 0;
         }
         const double raw=barTracking.delta/dt;
         barPosition=previousBar=barTracking.position;
-        const bool measured=barTracking.source==BarSource::Tracker && oldSource==BarSource::Tracker;
+        const bool measured=imuMode || (barTracking.source==BarSource::Tracker && oldSource==BarSource::Tracker);
         if(!measured) {
             // Estimated movement and return offsets cannot add stroke counts.
             // Re-arm only after a measured recovery once tracking has returned.
