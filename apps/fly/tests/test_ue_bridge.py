@@ -209,6 +209,7 @@ class UEBridgeTests(unittest.TestCase):
                 sim.step(dict(p,buttons=12),.02)  # physical Button 3+4 chord
                 for _ in range(1600): out=sim.step(p,.02)
                 self.assertTrue(out['airborne'])
+                self.assertEqual(out['audio']['touchdowns'],0)
                 self.assertGreater(out['altitude'],0)
                 before=sim.state.distance_meters
                 for _ in range(10): sim.step(dict(p,hmd_valid=False),.02)
@@ -217,9 +218,13 @@ class UEBridgeTests(unittest.TestCase):
                     out=sim.step(dict(p,power=0,speed=0),.02)
                     if not out['airborne']: break
                 self.assertFalse(out['airborne'])
+                self.assertEqual(out['audio']['touchdowns'],1)
+                self.assertEqual(sim.step(dict(p,power=0,speed=0),.02)['audio']['touchdowns'],1)
                 sim.stop()
                 out=sim.step(p,.02)
                 self.assertFalse(sim.state.ride_active)
+                self.assertFalse(out['audio']['active'])
+                self.assertEqual(out['audio']['touchdowns'],1)
                 self.assertEqual(sim.state.distance_meters,0)
                 self.assertEqual(out['align_request'],0)
                 self.assertEqual(out['alignment_applied'],0)

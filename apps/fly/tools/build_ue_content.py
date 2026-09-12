@@ -1,6 +1,8 @@
 """UE Editor Python: reproducible materials and a small startup map."""
 from pathlib import Path
 import unreal as u
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 assets = u.AssetToolsHelpers.get_asset_tools()
 mel = u.MaterialEditingLibrary
@@ -59,4 +61,6 @@ post.set_editor_property('settings', settings)
 # Geometry is loaded from the verified stream at BeginPlay, avoiding huge uassets.
 assert u.EditorLoadingAndSavingUtils.save_map(editor_world,'/Game/Maps/CesiumFly')
 u.EditorAssetLibrary.save_directory('/Game/Materials')
+from build_audio import build
+build(required=False)
 print('ARRIETTY_UE_CONTENT_READY')

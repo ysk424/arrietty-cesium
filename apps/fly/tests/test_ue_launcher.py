@@ -32,7 +32,7 @@ class LauncherArgumentTests(unittest.TestCase):
                         (directory/'tools/launch.py').write_text('import sys,json;print("ARGV="+json.dumps(sys.argv[1:]))',encoding='utf-8')
                         args=[executable,'-NoProfile','-ExecutionPolicy','Bypass','-File',str(root/(app+'.ps1')),'Lake Bled']
                         if app=='fly':
-                            args+=['-Offline','-StartMode','Air','-StartAglM','125.5','-mag','2.5']
+                            args+=['-Offline','-StartMode','Air','-StartAglM','125.5','-mag','2.5','-Volume','0.4']
                             if date: args+=['-LocalDate',date]
                         else: args+=['-Demo','-WaterLevelM','475.5']
                         result=subprocess.run(args,capture_output=True,text=True,errors='replace',timeout=30)
@@ -43,6 +43,7 @@ class LauncherArgumentTests(unittest.TestCase):
                             self.assertIn('--offline',values)
                             self.assertEqual(values[values.index('--start-agl')+1],'125.5')
                             self.assertEqual(values[values.index('--magnification')+1],'2.5')
+                            self.assertEqual(values[values.index('--volume')+1],'0.4')
                             if date: self.assertEqual(values[values.index('--date')+1],date)
                             else: self.assertNotIn('--date',values)
                         else:

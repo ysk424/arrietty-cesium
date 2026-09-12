@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
+#include "FlyAudioMix.h"
 #include "ArriettyPawn.generated.h"
 class UCameraComponent;
 class UWidgetComponent;
@@ -27,6 +28,9 @@ public:
 private:
     friend class FArriettyHmdAlignmentTest;
     UPROPERTY() TObjectPtr<USceneComponent> Origin;
+    UPROPERTY() TObjectPtr<class UFlyAudioComponent> FlightAudio;
+    FFlyAudioInput AudioInput;
+    bool bAudioFixture=false;
     UPROPERTY() TObjectPtr<USceneComponent> Tracking;
     UPROPERTY() TObjectPtr<UCameraComponent> Camera;
     UPROPERTY() TObjectPtr<UWidgetComponent> PanelComponent;

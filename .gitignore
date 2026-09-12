@@ -22,6 +22,7 @@ __pycache__/
 /apps/fly/sounds/*
 !/apps/fly/sounds/README.md
 /Firefly_audio/
+/wav_fly/
 
 /cesium.local.json
 /cache/

@@ -1,6 +1,7 @@
 """Flight entry point: destination -> Y -> scene -> isolated UE/bridge session."""
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import secrets
@@ -16,7 +17,8 @@ from arrietty_geo.common import PlaceError, confirmed, cesium_configuration, req
 from arrietty_geo.flight_scene import resolve, build_scene
 
 
-def launch_scene(path, scene, *, engine_root, offline=False, smoke=False, headless=False, prepare_only=False):
+def launch_scene(path, scene, *, engine_root, offline=False, smoke=False, headless=False, prepare_only=False, volume=.8):
+    if not math.isfinite(volume) or not 0<=volume<=1: raise PlaceError('Volume must be between 0 and 1')
     if (smoke or headless) and not (offline or prepare_only): raise PlaceError('Headless/Smoke requires Offline')
     hardware=not (offline or prepare_only)
     editor=Path(engine_root)/'Engine/Binaries/Win64/UnrealEditor.exe'
@@ -50,6 +52,7 @@ def launch_scene(path, scene, *, engine_root, offline=False, smoke=False, headle
     command=[str(editor),str(project),'/Game/Maps/CesiumFly','-game','-nosplash','-nop4','-windowed','-ResX=1600','-ResY=900','-abslog='+str(log),'-ExecCmds=t.MaxFPS 90,t.IdleWhenNotForeground 0']
     # OpenXR PreInit creates a runtime instance even with -nohmd on Windows.
     command+=['-vr'] if hardware else ['-nohmd','-DisablePlugins=OpenXR']
+    command+=['-FlyVolume='+str(volume),'-ini:Engine:[Audio]:UnfocusedVolumeMultiplier=1.0']
     if smoke: command+=['-ArriettySmoke','-unattended']
     if headless: command+=['-RenderOffscreen','-nosound','-ForceRes']
     if prepare_only: command+=['-FlyPrepareOnly','-unattended']
@@ -86,6 +89,7 @@ def main():
     p.add_argument('--resolve-only',action='store_true');p.add_argument('--prepare-only',action='store_true');p.add_argument('--refresh-place',action='store_true')
     p.add_argument('--start-mode',choices=['ground','air'],default='ground');p.add_argument('--start-agl',type=float,default=100);p.add_argument('--radius-km',type=float,default=10)
     p.add_argument('--magnification',type=float,default=1)
+    p.add_argument('--volume',type=float,default=.8)
     p.add_argument('--date',default='');p.add_argument('--time',default='12:00');p.add_argument('--model',default=os.environ.get('ARRIETTY_OPENAI_MODEL','gpt-5.4-mini'))
     p.add_argument('--engine-root',default='C:/Program Files/Epic Games/UE_5.8')
     args=p.parse_args()
@@ -105,7 +109,7 @@ def main():
     print('地表の高さは Cesium で確認します。'+('対地高度 '+str(args.start_agl)+' m から発進します。' if args.start_mode=='air' else '周辺の平坦な陸地を探します。'),flush=True)
     from arrietty_geo.live import live_session
     with live_session(not (args.offline or args.prepare_only)):
-        return launch_scene(path,scene,engine_root=args.engine_root,offline=args.offline,smoke=args.smoke,headless=args.headless,prepare_only=args.prepare_only)
+        return launch_scene(path,scene,engine_root=args.engine_root,offline=args.offline,smoke=args.smoke,headless=args.headless,prepare_only=args.prepare_only,volume=args.volume)
 
 
 if __name__=='__main__':

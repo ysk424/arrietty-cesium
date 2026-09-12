@@ -11,7 +11,7 @@ try {
     $log=Join-Path $logs 'ue-automation.log'
     & (Join-Path $EngineRoot 'Engine/Binaries/Win64/UnrealEditor-Cmd.exe') (Join-Path $app 'unreal/ArriettyUE/ArriettyUE.uproject') -unattended -nop4 -nosound -nohmd -DisablePlugins=OpenXR -NullRHI '-ExecCmds=Automation RunTests Arrietty.' '-TestExit=Automation Test Queue Empty' "-abslog=$log" *> (Join-Path $logs 'ue-automation-console.log')
     if($LASTEXITCODE -ne 0){throw 'UE automation failed'}
-    foreach($name in @('Coordinates.Attitude','Coordinates.HmdAlignment','Coordinates.Cesium','Terrain.Sweep')) {
+    foreach($name in @('Coordinates.Attitude','Coordinates.HmdAlignment','Coordinates.Cesium','Terrain.Sweep','Audio.Mix')) {
         if(-not (Select-String -LiteralPath $log -Pattern ('Result=\{Success\}.*Arrietty\.'+[regex]::Escape($name)) -Quiet)){throw "UE test failed: $name"}
     }
     Write-Output 'PASS Fly Python and UE coordinate/camera/terrain tests (no hardware).'

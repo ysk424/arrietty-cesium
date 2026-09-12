@@ -107,6 +107,40 @@ was subsequently confirmed above. Steering comfort, propulsion/audio timing,
 slow/short pulls, mounting movement and long-session drift still need evaluation.
 See [ROW_IMU.ja.md](ROW_IMU.ja.md).
 
+## Human-powered glider audio follow-up
+
+- On 2026-09-12 the user confirmed that the sound worked through fly.ps1 and
+  requested push. This is user listening acceptance of the current implementation,
+  separate from the automated evidence below. No per-condition listening report
+  or extended comfort result was supplied.
+- Six user-supplied masters were inspected: PCM16, 48 kHz, stereo; five 15 s
+  loops and one 1 s touchdown. Original hashes match the local preparation
+  manifest. Derived wind retains stereo, mechanical/contact sounds are mono,
+  loop joins use 0.2 s crossfades and all asset peaks are limited to 0.5.
+- UE 5.8.2 fly build and six PCM/ForceInline imports passed. Python: 111 tests
+  passed, including no-hardware bridge behavior, stale drive samples, terrain/
+  tracking/alignment gates, touchdown count, magnification-independent sound
+  telemetry and Volume forwarding through Windows PowerShell and pwsh.
+- The normal UE suite passed five editor tests (existing coordinates, HMD
+  alignment and terrain sweep, plus Audio.Mix). The empty-map audio fixture
+  passed two client tests, Audio.Mix and Audio.Assets. These share the mix test;
+  they are six distinct UE tests overall.
+- A real UE output capture completed with all six assets and exactly one
+  touchdown. Its 30 s sequence covered setup, pedalled ground travel, powered
+  flight, unpowered glide, fast glide, landing/roll and stop. Glide remained
+  audible; fast wind RMS exceeded slow glide; initial and final silence passed
+  the PCM quantization threshold; peak remained below 0.95. WAV evidence and
+  numerical verification are local under apps/fly/artifacts/audio/ue-mix-*.
+- Evidence logs: logs/fly/audio-build.log, audio-prepare.log, python-tests.log,
+  ue-automation.log and audio-runtime-*.log. Tests disabled OpenXR; the audio
+  fixture uses no bridge, device worker, microphone or terrain network request.
+  Live training logs/CSV were not test output destinations. Row code was untouched.
+
+The automated checks verify program behavior and exported samples; the user's
+separate listening confirmation is recorded above. Detailed HMD balance,
+pedal-propeller feel and individual landing-sound results were not reported.
+The optional stall sound is absent.
+
 ## Movement magnification follow-up
 
 `fly.ps1 -mag 1..10` was added after the user's first live Fuji ride. It scales

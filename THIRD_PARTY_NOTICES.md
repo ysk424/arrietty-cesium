@@ -23,6 +23,10 @@
   UE audio stay local and do not inherit the application MIT license.
   See apps/row/sounds/README.md.
 - Instrument exposure setup adapts MIT Arrietty-UE58, same copyright.
+- Six user-supplied flight sound masters, including pedal-powered propeller audio,
+  remain local under wav_fly/ or apps/fly/sounds/. Their derived PCM/UE assets are
+  also excluded from Git. No audio redistribution permission is inferred from
+  the application's MIT license. See docs/FLY_AUDIO.ja.md.
 - Optional inherited device diagnostics use Bleak (MIT) and pyopenvr (MIT).
 
 No old Lake Bled scenery, Epic engine code/binaries, downloaded Cesium plugin,

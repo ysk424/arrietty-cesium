@@ -7,6 +7,7 @@ param(
     [ValidateRange(10,3000)][double]$StartAglM=100,
     [ValidateRange(1,10)][double]$RadiusKm=10,
     [Alias('Mag')][ValidateRange(1,10)][double]$Magnification=1,
+    [ValidateRange(0,1)][double]$Volume=0.8,
     [string]$LocalDate='',[string]$LocalTime='12:00',[string]$Model='',
     [string]$EngineRoot='C:/Program Files/Epic Games/UE_5.8'
 )
@@ -18,7 +19,7 @@ $culture=[Globalization.CultureInfo]::InvariantCulture
 $launchArgs=@((Join-Path $PSScriptRoot 'apps/fly/tools/launch.py'),$Place,
     '--engine-root',$EngineRoot,'--start-mode',$StartMode.ToLowerInvariant(),
     '--start-agl',$StartAglM.ToString($culture),'--radius-km',$RadiusKm.ToString($culture),
-    '--magnification',$Magnification.ToString($culture),'--time',$LocalTime)
+    '--magnification',$Magnification.ToString($culture),'--volume',$Volume.ToString($culture),'--time',$LocalTime)
 if($LocalDate){$launchArgs+=@('--date',$LocalDate)}
 if($Model){$launchArgs+=@('--model',$Model)}
 if($Offline -or $Demo){$launchArgs+='--offline'}

@@ -1,4 +1,5 @@
 #include "ArriettyPawn.h"
+#include "FlyAudioComponent.h"
 #include "ArriettyWorld.h"
 #include "CesiumCreditSystem.h"
 #include "ArriettyPanel.h"
@@ -30,6 +31,7 @@ AArriettyPawn::AArriettyPawn()
     PrimaryActorTick.bCanEverTick=true;
     AutoPossessPlayer=EAutoReceiveInput::Player0;
     Origin=CreateDefaultSubobject<USceneComponent>(TEXT("Vehicle")); SetRootComponent(Origin);
+    FlightAudio=CreateDefaultSubobject<UFlyAudioComponent>(TEXT("FlightAudio"));
     Tracking=CreateDefaultSubobject<USceneComponent>(TEXT("XROrigin")); Tracking->SetupAttachment(Origin);
     Camera=CreateDefaultSubobject<UCameraComponent>(TEXT("HMD")); Camera->SetupAttachment(Tracking);
     Camera->bLockToHmd=true; Camera->bUsePawnControlRotation=false; Camera->SetFieldOfView(95);
@@ -55,6 +57,8 @@ void AArriettyPawn::BeginPlay()
 {
     Super::BeginPlay();
     BeganAt=FPlatformTime::Seconds();
+    bAudioFixture=FParse::Param(FCommandLine::Get(),TEXT("FlyAudioFixture")) && FParse::Param(FCommandLine::Get(),TEXT("nohmd"));
+    if(bAudioFixture) { Camera->bLockToHmd=false; FlightAudio->Initialize(); return; }
     PanelComponent->InitWidget(); Panel=Cast<UArriettyPanel>(PanelComponent->GetWidget());
     if(auto Material=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Materials/M_Instruments.M_Instruments")))
         PanelComponent->SetMaterial(0,Material);
@@ -68,6 +72,7 @@ void AArriettyPawn::BeginPlay()
     }
     Token=Config->GetStringField(TEXT("token"));
     bOffline=!Config->GetBoolField(TEXT("hardware"));
+    FlightAudio->Initialize();
     bSmoke=FParse::Param(FCommandLine::Get(),TEXT("ArriettySmoke"));
     Remote=ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateInternetAddr();
     bool Valid; Remote->SetIp(TEXT("127.0.0.1"),Valid); Remote->SetPort(Config->GetIntegerField(TEXT("port")));
@@ -128,6 +133,7 @@ void AArriettyPawn::Send(bool Quit)
 void AArriettyPawn::Tick(float Delta)
 {
     Super::Tick(Delta);
+    if(bAudioFixture) { FlightAudio->TickFixture(Delta); return; }
     if(!Geography) Geography=AArriettyWorld::Get(GetWorld());
     WorldReady=Geography && Geography->IsReady();
     if(Geography) {
@@ -210,6 +216,17 @@ void AArriettyPawn::Tick(float Delta)
         if(!P->TryGetStringField(TEXT("token"),ResponseToken) || ResponseToken!=Token || !P->TryGetNumberField(TEXT("seq"),ResponseSeq) || ResponseSeq<=ReceivedSequence) continue;
         ReceivedSequence=ResponseSeq; LastPacket=Now;
         bool Playing=false; P->TryGetBoolField(TEXT("playing"),Playing);
+        const TSharedPtr<FJsonObject>* Audio=nullptr;
+        AudioInput.Active=false;
+        if(Playing && P->TryGetObjectField(TEXT("audio"),Audio))
+        {
+            (*Audio)->TryGetBoolField(TEXT("active"),AudioInput.Active);
+            (*Audio)->TryGetBoolField(TEXT("airborne"),AudioInput.Airborne);
+            AudioInput.Speed=(*Audio)->GetNumberField(TEXT("speed"));
+            AudioInput.Cadence=(*Audio)->GetNumberField(TEXT("cadence"));
+            AudioInput.Power=(*Audio)->GetNumberField(TEXT("power"));
+            AudioInput.Touchdowns=(*Audio)->GetIntegerField(TEXT("touchdowns"));
+        }
         FString TerrainStatus;P->TryGetStringField(TEXT("terrain_status"),TerrainStatus);
         if(Panel) { Panel->Telemetry=P; Panel->bPlaying=Playing; Panel->Status=bOffline?TEXT("OFFLINE | R: ALIGN | ESC: SETUP"):TEXT("LIVE | R: ALIGN | ESC: SETUP"); }
         if(Panel && !TerrainStatus.IsEmpty()) Panel->Status=TerrainStatus;
@@ -278,6 +295,10 @@ void AArriettyPawn::Tick(float Delta)
         bPlaying=false; Aligned=0; PendingAlignment=0;
         if(Panel) { Panel->Status=TEXT("CONNECTION LOST | P: RESTART"); Panel->bPlaying=false; }
     }
+    auto CurrentAudio=AudioInput;
+    const bool Tracked=bOffline || (GEngine->XRSystem.IsValid() && GEngine->XRSystem->IsTracking(IXRTrackingSystem::HMDDeviceId));
+    CurrentAudio.Active &= bPlaying && WorldReady && Tracked && LastPacket>0 && Now-LastPacket<=1;
+    FlightAudio->Update(CurrentAudio,Delta);
 }
 
 void AArriettyPawn::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult)

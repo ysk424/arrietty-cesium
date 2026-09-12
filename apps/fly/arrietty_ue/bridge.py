@@ -15,6 +15,7 @@ import socket
 import time
 
 from arrietty_ue.terrain import FlightTerrain
+from arrietty_ue.audio import audio_state
 from arrietty_geo.flight_scene import local_instant
 from arrietty_geo import solar
 
@@ -96,6 +97,7 @@ class Simulation:
         self.controller_status = "WAITING"
         self.apply_id = 0
         self.apply_error = ""
+        self.touchdowns = 0
 
     def setup(self, packet):
         request = int(packet.get("apply_id", 0))
@@ -249,7 +251,10 @@ class Simulation:
         s.world_velocity_mps=(0.,0.,0.)
         s.world_speed_kmh=0.;s.world_vertical_speed_mps=0.
         if s.ride_active and s.steering_tracking and s.hmd_aligned:
+            was_airborne = s.flight.airborne
             moved = self.terrain.advance(s,delta,now) if self.terrain else (s.advance_flight(delta, now) if s.flight_enabled else s.advance_ground(delta))
+            if was_airborne and not s.flight.airborne and (not self.terrain or not self.terrain.message):
+                self.touchdowns += 1
             if moved > 0 and s.first_motion_after_seconds <= 0:
                 s.first_motion_after_seconds = max(.000001, now - s.ride_started_at_seconds)
         s.fan.tick(s.fan_apparent_speed_kmh() if s.hmd_aligned and s.steering_tracking and (not self.terrain or (self.terrain.ready and not self.terrain.message)) else 0, now)
@@ -260,6 +265,7 @@ class Simulation:
                 "recenter_id": self.recenter_id,
                 "alignment_applied": self.applied_alignment_id,
                 "ride": s.ride_active, "airborne": s.flight.airborne,
+                "audio": audio_state(s, self.terrain, now, self.touchdowns),
                 "pitch": s.flight.pitch_degrees, "bank": s.flight.bank_degrees,
                 "heading": s.navigation_heading_degrees,
                 "home_relative": s.home_relative_degrees,

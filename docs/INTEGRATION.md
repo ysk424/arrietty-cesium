@@ -122,3 +122,18 @@ or nonexistent DST clock times are rejected. NOAA solar mathematics was copied
 from the MIT Secret-World solar module; Blender/editor code was omitted. No
 Secret-World import or sibling path is used. Time is frozen after Apply.
 The accepted aerodynamic constants, including fixed air density, are unchanged.
+
+## Flight audio
+
+Python sends read-only physical air/ground speed, fresh cadence/power, airborne
+and readiness flags plus a monotonically increasing accepted-touchdown count.
+Touchdowns are detected only across actual advance steps, after terrain accepts
+motion, never across recovery or setup. UE consumes authenticated telemetry and
+locally gates it by play, geography, HMD tracking and the one-second watchdog.
+The native mixer smooths six bounded voices; magnification is absent from its
+inputs. Pedal/propeller fade after cadence stops, while gliding wind continues.
+No audio code writes device commands or changes physics. The propeller has a
+0.4 s decay time constant; other active loops use 0.18 s. Global stops fade faster.
+Master volume is 0..1 (default .8). Voices are non-spatialized and may not overlap
+multiple instances. Wind is stereo, mechanics mono. Original audio is local;
+derived loop joins, headroom, imports and verification are described in FLY_AUDIO.ja.md.

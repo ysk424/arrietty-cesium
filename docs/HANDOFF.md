@@ -1,5 +1,12 @@
 # Current handoff — 2026-09-12
 
+Fly audio acceptance update: the user confirmed that sound worked through
+fly.ps1 and requested push on 2026-09-12. Record this as user listening
+acceptance of the current audio implementation, separate from the earlier
+offline mixer capture. No detailed per-condition listening results or extended
+comfort measurements were supplied. Six masters and all generated audio remain
+local; the repository contains playback, import/verification tools and docs.
+
 Row acceptance update: after the OpenVR path fix, the user reported successful
 operation and requested documentation and push. The subsequent normal launch
 logged OpenVR available=1, geography ready, calibration and rowing start. This
@@ -83,25 +90,37 @@ special handling ends. Terrain availability and path collision gate motion.
 Recovery restores a verified 3D pose. See VALIDATION.md for actual evidence and
 remaining live checks. Initial global radius is capped at 10km. No globe rebasing.
 
-## Next work: human-powered glider audio
+## Human-powered glider audio: implemented and user confirmed
 
-The user will create sound masters later. The production brief is
-[FLY_AUDIO.ja.md](FLY_AUDIO.ja.md); local delivery directory is apps/fly/sounds/.
-Prepare five core files: wind-soft.wav, wind-fast.wav, pedal-drive.wav,
-ground-roll.wav, touchdown.wav. Optional sixth: stall-buffet.wav. The first four
-are loops; touchdown is a short one-shot. The brief includes durations, channels
-and export settings. Audio import/playback for fly is not implemented yet.
+The user supplied six PCM16/48 kHz stereo masters in root wav_fly/, including
+an additional pedal-powered propeller loop. Five loops are 15 s and touchdown
+is 1 s. The importer accepts the delivered double extensions and embedded space;
+never rename or overwrite these originals or their FireFlyOriginal directory.
+Canonical files in apps/fly/sounds/ take precedence. All sound masters and
+generated assets are ignored by Git. Source hashes are recorded locally in
+apps/fly/artifacts/audio/preparation.local.json. See [FLY_AUDIO.ja.md](FLY_AUDIO.ja.md).
 
-Preserve the quiet human-powered glider character: no combustion/jet engine.
-Stopping pedalling should fade drive sound while gliding wind continues. Use
-speed-dependent wind layers with bounded gains; -mag must not multiply volume,
-pitch or physical fan output by its numeric value. Keep hardware rules intact.
-Original masters remain local and unchanged; prepare derived UE assets separately.
-Air rings, route markers and new ambient beds were suggestions, not implemented
-or approved additions. The next concrete task after assets arrive is audio
-integration plus offline capture and live listening checks.
+Fly now has six independent audio voices: soft/fast wind, pedal drivetrain,
+propeller, wheels and touchdown. The native mixer smooths and bounds volume and
+pitch. Gliding wind follows physical AIR speed after pedalling stops; cadence
+drives pedal/propeller sound, which fades on zero cadence or stale FTMS input.
+Propeller decay is slower than drivetrain decay. Ground roll is grounded only.
+Touchdown is counted by accepted flight-to-ground transitions, avoiding repeats
+from successive packets, setup and recovery. Setup, tracking/terrain gates,
+Esc and the bridge watchdog mute the mix. -Volume is 0..1, default .8.
+Magnification, physics and device/fan commands remain independent of audio.
+Wind stays stereo; mechanical sounds are downmixed to mono; no row ear correction.
 
-Latest automated evidence: fly 107 Python tests and 4 UE tests; row 10 Python,
+prepare_audio.ps1 regenerates derived WAV/UE imports. Full Fly preparation also
+imports available masters, allowing new builds without any supplied audio.
+test_audio.ps1 runs an empty-map fixture with OpenXR disabled and no bridge,
+devices, microphone or Cesium requests. The actual 30 s UE output passed asset,
+mix, glide/fast-wind, single-touchdown and silence checks. The later user
+listening confirmation is recorded above; per-condition and extended comfort
+results were not reported. Optional stall audio, air rings, routes and new
+ambient beds remain unimplemented.
+
+Latest automated evidence before audio: fly 107 Python tests and 4 UE tests; row 10 Python,
 208 native checks and its UE setup test. Two actual Fuji renders at 1x/10x kept
 initial AGL=100m and travelled about 396m/3.96km over the same 41s with no stopped
 samples after the first second. See VALIDATION.md for scope and limitations.

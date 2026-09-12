@@ -20,8 +20,9 @@ coordinates, height, terrain and process boundaries. Do not modify siblings.
   plugins/SDKs and caches stay out of Git. Never print tokens or pass them in argv.
 - Record actual tests and limitations. No demo/native test establishes live VR
   acceptance. Check running processes before rebuilding; do not stop a live ride.
-- Fly is a human-powered glider. Sound production is pending user-supplied
-  masters; docs/FLY_AUDIO.ja.md is the proposed five-core/one-optional sound brief.
+- Fly is a human-powered glider. Six user masters, including a pedal-powered
+  propeller, are imported locally from wav_fly/ or apps/fly/sounds/. Preserve
+  masters; docs/FLY_AUDIO.ja.md defines the mix and offline capture workflow.
   Keep glide wind after pedalling stops. No engine audio or automatic changes
   to hardware loads/fan response when adding movement/audio effects.
 - Check the staged public tree before publication. Do not publish unless asked.
