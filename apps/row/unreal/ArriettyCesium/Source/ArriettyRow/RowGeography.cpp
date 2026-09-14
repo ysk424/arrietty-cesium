@@ -173,6 +173,7 @@ static bool InsideRing(const TArray<FVector2D>& Ring,FVector2D P) {
     return inside;
 }
 bool ARowGeography::CanNavigate(FVector Position) const {
+    if(Position.ContainsNaN()) return false;
     const FVector2D p(Position.X*.01,Position.Y*.01);
     if(p.Size()>RadiusM) return false;
     for(const auto& poly:Polygons) {
@@ -182,6 +183,23 @@ bool ARowGeography::CanNavigate(FVector Position) const {
         if(!hole) return true;
     }
     return false;
+}
+bool ARowGeography::CanNavigatePath(FVector From,FVector To) const {
+    if(!CanNavigate(From) || !CanNavigate(To)) return false;
+    // The radius is convex, so endpoint checks suffice for it. Polygon holes
+    // and narrow banks need segment intersections, even with clear endpoints.
+    const FVector2D a(From.X*.01,From.Y*.01),b(To.X*.01,To.Y*.01);
+    const auto cross=[](FVector2D u,FVector2D v) { return u.X*v.Y-u.Y*v.X; };
+    for(const auto& poly:Polygons) for(const auto& ring:poly.Rings) {
+        for(int i=0,j=ring.Num()-1;i<ring.Num();j=i++) {
+            const auto& c=ring[j]; const auto& d=ring[i];
+            if(FMath::Max(a.X,b.X)<FMath::Min(c.X,d.X) || FMath::Max(c.X,d.X)<FMath::Min(a.X,b.X) ||
+               FMath::Max(a.Y,b.Y)<FMath::Min(c.Y,d.Y) || FMath::Max(c.Y,d.Y)<FMath::Min(a.Y,b.Y)) continue;
+            const double abC=cross(b-a,c-a),abD=cross(b-a,d-a),cdA=cross(d-c,a-c),cdB=cross(d-c,b-c);
+            if(abC*abD<=0 && cdA*cdB<=0) return false;
+        }
+    }
+    return true;
 }
 void ARowGeography::ConfigureWater(UMaterialInstanceDynamic* M) const {
     M->SetTextureParameterValue(TEXT("WaterMask"),Mask);

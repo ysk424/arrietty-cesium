@@ -8,6 +8,7 @@ UE 5.8 と Cesium の実世界地形を使う、ローイングと人力飛行�
 ```powershell
 ./row.ps1 "Koh Hong"                       # 海でローイング
 ./row.ps1 "中禅寺湖"                        # 湖でローイング
+./row.ps1 "中禅寺湖" -mag 5                 # 地形上の移動を5倍にする
 ./fly.ps1 "Funafuti International Airport Tuvalu"  # 地上から離陸
 ./fly.ps1 "富士山" -StartMode Air           # 地表から100m上で発進
 ./fly.ps1 "富士山" -StartMode Air -StartAglM 200
@@ -42,6 +43,18 @@ rowとflyの実機モードは同時に起動できません。機器設定は�
 - 左右への体の移動で操舵。頭の向きだけでは曲がりません。左右8cmは直進域です。
 - テンキー0: 終了・記録・開始位置へ戻ります。
 - 機器の負荷設定は読み取りのみ。心拍不明は`--`です。
+
+`-mag`（正式名`-Magnification`）で地形上の移動を1～10倍にできます。省略時は1倍、
+`-mag 2.5`のような小数も使えます。等倍で10km/hの漕ぎ方なら、5倍では約50km/h相当です。
+計器の速度（倍率指定時は`WORLD km/h x5`など）と距離は倍率後の値です。
+漕ぐ力の計算、校正、左右への体の移動による旋回速度、波・音の強さは従来通りです。
+旋回半径は倍率に応じて大きくなり、航行範囲の境界へも早く到達します。
+水面の高さと曲率は維持し、岸・島・航行範囲は倍率後の進路全体で確認します。
+
+ローイングマシンの負荷は**1～16**です。受信した負荷をゲーム用の出力補正に使います。
+`-mag`はこの負荷補正とは別の移動倍率です。本体から0 Wを受信したときは、
+負荷11～16でも推進力を加えません。負荷が未受信・範囲外・3秒以上更新されないときは
+`LOAD -- (x1)`となります。アプリから負荷を変更しません。
 
 バーのTracker 3.0の代わりにWT9011DCLのBLE加速度・姿勢通知も使用できます。
 IMUモードでは正面を向いてバーを前へ出して静止し、最初に手前へ引いて2往復で校正します。
@@ -190,6 +203,10 @@ Cesium 2.29.1・EGM96を共通管理し、各アプリのビルド出力・Pytho
 `altitude_m`列は発進地点からの相対高度です。
 `movement_magnification`、`world_speed_kmh`、`world_vertical_speed_mps`に倍率と
 地形に対する速度を記録します。従来の`speed_kmh`は飛行計算上の速度、`distance_m`は地形上の距離です。
+
+RowのCSVにも`movement_magnification`と`world_speed_kmh`を追加します。
+Rowの`speed_kmh`は倍率前の艇の計算速度、`distance_m`は倍率後の距離です。
+`resistance_raw`と`resistance_age_s`には、負荷の受信値と最終受信からの秒数を記録します。
 
 現在の検証結果と実機確認の範囲は[検証記録](docs/VALIDATION.md)、設計は[統合仕様](docs/INTEGRATION.md)を参照してください。
 公開前に`python tools/check_public_tree.py`と`python tools/check_public_tree.py --history`で検査します。

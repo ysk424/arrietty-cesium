@@ -9,6 +9,7 @@ public:
     FString Distance=TEXT("0 m"),Time=TEXT("00:00"),Speed=TEXT("0.0"),Heart=TEXT("--");
     FString Status=TEXT("NUM ENTER  Start"),Detail=TEXT("Lake Bled / Slovenia");
     FString Guide;
+    double MovementMagnification=1;
     float LeanCm=0;
     bool SteeringAvailable=false;
     virtual int32 NativePaint(const FPaintArgs&,const FGeometry&,const FSlateRect&,FSlateWindowElementList&,

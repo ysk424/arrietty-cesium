@@ -22,6 +22,26 @@ project extracts its own plugin build tree from the same verified archive.
 
 ## Height and coordinate contract
 
+Row supports `-Magnification` / `-mag` (1..10, default 1, decimals allowed),
+forwarded as `--magnification` (`--mag` also accepted by Python) and
+`-RowMagnification` to UE. The rowing model scales only the final horizontal
+travel after its existing physics and steering step. Speed, power, drive,
+strokes, elapsed time, calibration and yaw rate are unchanged. Water/audio
+receive the original physical speed and drive; curved mean water determines
+the new position's Z. Stop/Home preserves the launch option. Model distance,
+the speed panel and `world_speed_kmh` describe magnified geographic motion;
+CSV `speed_kmh` retains the physical model speed and `movement_magnification`
+records the option. Turn radius grows with magnification. Water polygon edges
+and holes are checked against the whole proposed path plus the existing 2.5m
+clearance; mesh sweeps cover the scaled step in <=0.5m pieces following curved
+water. A blocked step rolls back its distance and pauses. Radius is unchanged.
+
+Row's load gain accepts fresh integer dial values 1..16, independently of
+movement magnification. Fresh zero machine watts remain zero, including at
+maximum load. Unknown, invalid or >=3s stale load yields unknown LOAD and unity
+power gain. CSV appends `resistance_raw` and `resistance_age_s` for diagnosis;
+they never authorize a device write or revive invalid/stale data.
+
 - Row: the launch mean water surface is local Z=0; its existing curved water
   model and lake MSL evidence requirements remain unchanged.
   Lake launch selection prefers 150 m shoreline clearance, falling back to the

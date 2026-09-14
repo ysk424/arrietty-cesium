@@ -25,6 +25,7 @@ public:
 private:
     friend class FRowKeyInput;
     friend class FRowSetupControlsTest;
+    friend class FRowMovementTest;
     void Toggle();
     void ShowSetupPanel();
     void FinishCalibration(const row::Input& Input);
@@ -57,6 +58,7 @@ private:
     double Began=0,NextRecord=0,SimTime=0,QuitAfter=0;
     double CalibrationMotionTime=0;
     double OfflineBarRest=.38;
+    double MovementMagnification=1;
     float OarBlend=0;
     double ScreenshotAt=0;
     FString ScreenshotPath;

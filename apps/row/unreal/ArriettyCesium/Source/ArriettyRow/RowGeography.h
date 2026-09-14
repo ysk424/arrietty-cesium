@@ -26,10 +26,12 @@ public:
     float GetSpawnYaw() const { return SpawnYaw; }
     double SurfaceHeightCm(double Xcm,double Ycm) const;
     bool CanNavigate(FVector Position) const;
+    bool CanNavigatePath(FVector From,FVector To) const;
     void ConfigureWater(UMaterialInstanceDynamic* Material) const;
     double GetRenderRadiusCm() const { return Ocean?3000000.:FMath::Max(FMath::Max(FMath::Abs(Bounds.X),FMath::Abs(Bounds.Y)),FMath::Max(FMath::Abs(Bounds.X+Bounds.Z),FMath::Abs(Bounds.Y+Bounds.W)))+5000.; }
     FString PlaceLabel;
 private:
+    friend class FRowMovementTest;
     void Fail(const TCHAR* Code,const TCHAR* Text);
     void HeightsSampled(ACesium3DTileset*,const TArray<FCesiumSampleHeightResult>&,const TArray<FString>&);
     UPROPERTY() TObjectPtr<ACesium3DTileset> Terrain;

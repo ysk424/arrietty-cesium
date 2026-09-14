@@ -1,4 +1,39 @@
-# Current handoff — 2026-09-12
+# Current handoff — 2026-09-15
+
+Row now supports root `-mag` / `-Magnification` 1..10 (default 1, decimals),
+Python `--mag` / `--magnification`, and UE `-RowMagnification`. Only the final
+travel distance is multiplied; rowing physics, calibration, HMD lateral yaw
+response, water/audio intensity and read-only hardware behavior remain intact.
+The panel shows magnified world speed and distance. CSV keeps physical
+`speed_kmh`, makes `distance_m` geographic, and appends `movement_magnification`
+and `world_speed_kmh`. Stop/Home retains the multiplier. See README and
+INTEGRATION for scaled-path polygon checks and short curved-water mesh sweeps.
+
+The user also asked to check load behavior above 10: the existing accepted range
+was already 1..16, with no level-ten cutoff. Tests now decode every level through
+both FTMS packet layouts and check propulsion through levels 9..16. Fresh zero
+machine watts still yield zero thrust; unknown/invalid/stale load stays unity.
+No speculative change was made to telemetry decoding or load gain. CSV appends
+`resistance_raw` and `resistance_age_s` for diagnosis at the next live ride.
+The reported high-load behavior has not been reproduced with hardware.
+The user clarified that LOAD does change; the symptom follows stopping and
+changing load before rowing again. At the next ride, compare the machine's own
+speed/watts display with the received BT watts while resuming strokes. Keep
+fresh-zero handling unchanged until the source of the discrepancy is known.
+
+Row native checks: 363; Python tests: 14; UE 5.8.2 rebuild and both Controls.SetupEnter
+and Movement.Magnification passed. The new UE test checks actual pawn translation,
+panel speed, pause/Home, a narrow island between clear endpoints, radius, blocked
+distance rollback, curved water and diagnostic CSV. Test mode disables OpenXR
+and opens no device workers. No app was running before rebuild. The user requested
+publication on 2026-09-15 and will perform the next live ride later. See VALIDATION
+for final render evidence and limits.
+The 10x Moraine Lake synthetic render reached 141.124m, then paused at the shore;
+one CSV sample showed 9.603km/h physical and 96.028km/h world speed. The screenshot
+was inspected and the process exited normally. This short non-VR preview does
+not establish long-distance streaming, magnified comfort or live load behavior.
+
+## Previous handoff — 2026-09-12
 
 Fly audio acceptance update: the user confirmed that sound worked through
 fly.ps1 and requested push on 2026-09-12. Record this as user listening

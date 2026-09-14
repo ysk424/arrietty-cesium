@@ -7,6 +7,7 @@ param(
     [switch]$RefreshPlace,
     [ValidateRange(0,1)][double]$Volume=0.8,
     [ValidateRange(1,10)][double]$RadiusKm=3,
+    [Alias('Mag')][ValidateRange(1,10)][double]$Magnification=1,
     [Nullable[double]]$WaterLevelM=$null,
     [string]$Model='',
     [string]$EngineRoot='C:/Program Files/Epic Games/UE_5.8'
@@ -16,7 +17,8 @@ $python=Join-Path $PSScriptRoot 'apps/row/.venv/Scripts/python.exe'
 if(-not (Test-Path -LiteralPath $python)) { throw 'Run ./tools/prepare.ps1 first.' }
 $culture=[Globalization.CultureInfo]::InvariantCulture
 $launchArgs=@((Join-Path $PSScriptRoot 'apps/row/tools/launch.py'),$Place,'--engine-root',$EngineRoot,
-    '--volume',$Volume.ToString($culture),'--radius-km',$RadiusKm.ToString($culture))
+    '--volume',$Volume.ToString($culture),'--radius-km',$RadiusKm.ToString($culture),
+    '--magnification',$Magnification.ToString($culture))
 if($Demo){$launchArgs+='--demo'}
 if($ResolveOnly){$launchArgs+='--resolve-only'}
 if($PrepareOnly){$launchArgs+='--prepare-only'}

@@ -28,6 +28,18 @@ int main() {
     row::parseRower(last.data(),last.size(),20,t);
     check(!t.power.fresh(20) && t.elapsed.fresh(20),"unrelated fragment cannot revive power");
     check(!t.resistance.fresh(20),"unrelated fragment cannot revive dial level");
+    for(int level=1;level<=16;++level) {
+        for(bool more:{false,true}) {
+            row::Telemetry decoded;
+            std::vector<uint8_t> packet{uint8_t(more?0xa1:0xa0),0};
+            if(!more) packet.insert(packet.end(),{40,10,0});
+            packet.insert(packet.end(),{80,0,uint8_t(level),0});
+            check(row::parseRower(packet.data(),packet.size(),22,decoded),"all sixteen dial levels decode in both FTMS layouts");
+            const auto sample=row::samplePower(decoded,22,-.5);
+            check(sample.resistance==level && sample.multiplier==level && sample.machineWatts==80 && sample.gameWatts==80*level,
+                "received levels 1 through 16 retain exact gain without a level-ten cutoff");
+        }
+    }
     for(size_t n=0;n<part.size();++n) { auto copy=t; check(!row::parseRower(part.data(),n,21,copy),"reject truncation"); check(copy.power.received==10,"atomic failure"); }
     const uint8_t h8[]{6,90},h16[]{7,100,0},contactLost[]{4,90},short16[]{1,90};
     check(row::parseHeart(h8,2)==90 && row::parseHeart(h16,3)==100,"8/16 bit HR");
@@ -56,19 +68,43 @@ int main() {
     }
     powerTelemetry.power.set(std::numeric_limits<double>::quiet_NaN(),17);
     check(!row::samplePower(powerTelemetry,17,-.5).usingBt,"nonfinite watts use tracker estimate");
-    auto rowAtLoad=[](double load) {
+    auto rowAtLoad=[](double load,double mag=1,double lean=0) {
         row::Model boat; auto in=input(0,.4); start(boat,in);
         for(int i=1;i<=1440;++i) {
             const double time=i*.01,phase=std::fmod(time,2.4);
             const double bar=phase<.8?.4*std::cos(row::Pi*phase/.8):-.4*std::cos(row::Pi*(phase-.8)/1.6);
-            in=input(time,bar); in.telemetry.power.set(20,time); in.telemetry.resistance.set(load,time);
-            boat.tick(in,.01);
+            in=input(time,bar,lean); in.telemetry.power.set(20,time); in.telemetry.resistance.set(load,time);
+            boat.tick(in,.01,mag);
         }
         return boat;
     };
     const auto load1=rowAtLoad(1),load6=rowAtLoad(6),load16=rowAtLoad(16);
     check(load1.distance<load6.distance && load6.distance<load16.distance,"same strokes travel farther at higher dial levels");
     check(load16.speed<=5.5 && std::isfinite(load16.distance),"maximum dial preserves boat speed bound");
+    auto previousLoad=rowAtLoad(9);
+    for(int level=10;level<=16;++level) {
+        const auto higher=rowAtLoad(level);
+        check(higher.distance>previousLoad.distance && higher.strokes==previousLoad.strokes,"no propulsion discontinuity across levels ten through sixteen");
+        previousLoad=higher;
+    }
+    const auto ordinary=rowAtLoad(16,1,.18);
+    for(double mag:{1.,2.5,10.}) {
+        auto scaled=rowAtLoad(16,mag,.18);
+        check(std::abs(scaled.distance-ordinary.distance*mag)<1e-8,"world distance scales by decimal and maximum magnification");
+        check(scaled.speed==ordinary.speed && scaled.heading==ordinary.heading && scaled.yawRate==ordinary.yawRate &&
+            scaled.power==ordinary.power && scaled.drive==ordinary.drive && scaled.strokes==ordinary.strokes && scaled.elapsed==ordinary.elapsed,
+            "magnification preserves power, physical speed, turning, stroke detection, time and audio inputs");
+        scaled.pause(); const double distance=scaled.distance;
+        scaled.tick(input(15),.01,mag);
+        check(scaled.distance==distance && scaled.speed==0,"pause freezes magnified travel");
+        start(scaled,input(15)); auto lost=input(15.01); lost.head.valid=false;
+        check(scaled.tick(lost,.01,mag)==0 && scaled.distance==distance && scaled.state==row::State::TrackingLost,
+            "tracking loss stops magnified movement without adding distance");
+    }
+    for(double mag:{0.,.5,10.01,std::numeric_limits<double>::infinity(),std::numeric_limits<double>::quiet_NaN()}) {
+        row::Model invalid; start(invalid,input(0)); invalid.speed=2;
+        check(invalid.tick(input(.01),.01,mag)==0 && invalid.distance==0 && invalid.speed==0,"invalid magnification never moves the boat");
+    }
     row::Model fixedBar; start(fixedBar,input(0));
     for(int i=1;i<=300;++i) {
         auto in=input(i*.01); in.telemetry.resistance.set(16,in.now); fixedBar.tick(in,.01);

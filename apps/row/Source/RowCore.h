@@ -10,6 +10,8 @@
 
 namespace row {
 constexpr double Pi = 3.14159265358979323846;
+constexpr int MaxResistanceLevel=16;
+inline bool validMagnification(double value) { return std::isfinite(value) && value>=1 && value<=10; }
 struct Field {
     double value=0, received=-1e9;
     bool fresh(double now, double ttl=3.0) const { return now>=received && now-received<ttl; }
@@ -32,7 +34,7 @@ inline PowerSample samplePower(const Telemetry& t,double now,double barVelocity)
     p.baseWatts=p.usingBt?std::clamp(p.machineWatts,0.,1000.):
         std::isfinite(barVelocity)?std::clamp(-barVelocity*90.,0.,240.):0.;
     if(t.resistance.fresh(now) && std::isfinite(t.resistance.value) &&
-        t.resistance.value>=1 && t.resistance.value<=16 && std::floor(t.resistance.value)==t.resistance.value) {
+        t.resistance.value>=1 && t.resistance.value<=MaxResistanceLevel && std::floor(t.resistance.value)==t.resistance.value) {
         p.resistance=t.resistance.value; p.multiplier=p.resistance;
     }
     p.gameWatts=p.baseWatts*p.multiplier;
@@ -130,9 +132,9 @@ struct Model {
     void calibrate() { pause(); state=State::Calibrating; lean=steer=0; }
     void reset() { *this=Model{}; }
     // <=20ms substeps in caller; long frame gaps stop rather than launch the boat.
-    double tick(const Input& in,double dt) {
+    double tick(const Input& in,double dt,double magnification=1) {
         if(state!=State::Running) return 0;
-        if(!headTracking(in) || !std::isfinite(dt) || dt<=0 || dt>.1 || in.useImu!=imuMode) {
+        if(!headTracking(in) || !std::isfinite(dt) || dt<=0 || dt>.1 || in.useImu!=imuMode || !validMagnification(magnification)) {
             barTracking.issue=!headTracking(in)?TrackingIssue::HeadLost:TrackingIssue::FrameGap;
             state=State::TrackingLost; speed=drive=power=yawRate=0; return 0;
         }
@@ -193,7 +195,9 @@ struct Model {
         const double drag=5.5*speed*speed+4.*speed;
         const double old=speed;
         speed=std::clamp(speed+std::clamp((thrust-drag)/105.,-1.1,1.25)*dt,0.,5.5);
-        const double moved=(old+speed)*.5*dt;
+        // Scale geographic travel only, after the accepted rowing/steering step.
+        // Model speed, drive and watts remain physical inputs to water and audio.
+        const double moved=(old+speed)*.5*dt*magnification;
         distance+=moved; elapsed+=dt; return moved;
     }
 };

@@ -1,4 +1,56 @@
-# Row / Fly integration validation — 2026-09-12
+# Row / Fly integration validation — 2026-09-15
+
+## Row movement magnification and 16-level check
+
+- Root `row.ps1 -mag` / `-Magnification`, Python `--mag` / `--magnification`,
+  and UE `-RowMagnification` support 1..10, default 1 and fractional values.
+  Physical rowing speed, watts, drive, steering, calibration and water/audio
+  inputs are unchanged. World translation, distance and displayed speed scale.
+  Scaled paths check water polygon boundaries and holes exactly, plus the
+  existing 2.5m clearance. Loaded terrain is swept in <=0.5m pieces following
+  curved mean water; the existing hidden-imagery tolerance is retained.
+- Existing load logic already accepted 1..16; no level-ten cap was found.
+  Every level now passes real FTMS decoder tests in both packet layouts with
+  synthetic values. Tests check increasing propulsion from levels 9 through 16,
+  maximum speed, stationary-handle gating, zero watts, invalid and stale load.
+  Zero received watts remain zero at high load. The user's reported high-load
+  behavior has not been reproduced on hardware; no firmware/encoding cause is
+  established. `resistance_raw` and `resistance_age_s` provide local diagnostics
+  without changing accepted power gain or issuing BLE commands.
+- MSVC native suite passed **363 checks**: core 192, water 46, audio 16,
+  tracking 42, IMU 54, terrain 13. The new 1x/2.5x/10x comparisons retain identical
+  physical speed, heading, yaw rate, power, drive, strokes and elapsed time while
+  scaling distance. Pause and tracking loss still stop; invalid multipliers
+  never move the boat. Evidence: logs/row/magnification-native-tests.log.
+- **14 Python tests** passed. Actual Windows PowerShell 5.1 and PowerShell 7
+  launcher transport was exercised with default, `-mag 2.5` and
+  `-Magnification 10` under a decimal-comma culture. Python-to-UE forwarding
+  was intercepted after explicit Y; invalid values fail before place lookup.
+  Existing N/EOF, unknown-lake and water-datum tests passed. Tests use temporary
+  settings/log destinations and fake credentials. Evidence:
+  logs/row/magnification-python-tests.log.
+- UE 5.8.2 rebuilt successfully. **Controls.SetupEnter** and
+  **Movement.Magnification** both passed in the actual offline game fixture.
+  Checks include pawn displacement, world-speed panel, pause, Home retaining
+  the multiplier, a 10cm island between clear water endpoints, radius, blocked
+  movement with no distance credit, curved water height and appended CSV fields.
+  Evidence: logs/row/magnification-ue-build.log,
+  logs/row/magnification-ue-tests.log and setup-controls-20260915-061720.log.
+- A real Cesium Moraine Lake render with synthetic straight rowing and 10x
+  movement reached geography readiness, calibrated and travelled **141.124m**
+  before the shore check paused it at 9.301s active time. A recorded sample had
+  physical speed 9.603km/h and world speed 96.028km/h (independently rounded).
+  The inspected screenshot shows `WORLD km/h x10`, the 141m distance and
+  `Shore / paused`; the process exited normally. Evidence:
+  logs/row/magnification-10-preview.log and apps/row/artifacts/magnification-10.png.
+  This was a short, sound-disabled, non-VR preview ending at the nearby shore;
+  it does not establish long-distance terrain streaming or magnified VR comfort.
+- No UE application was running before rebuild. Tests disabled OpenXR and used
+  no rower, IMU, HMD, heart-rate or other device workers. Existing live training
+  logs and records were not test output destinations. These tests do not
+  establish magnified VR comfort or live load-level acceptance. Fly and sibling
+  repositories were not modified. The user subsequently requested publication;
+  the next live ride and high-load symptom check remain pending.
 
 ## Row user confirmation after fixes
 

@@ -15,7 +15,8 @@ int32 URowPanel::NativePaint(const FPaintArgs&,const FGeometry& g,const FSlateRe
     const FLinearColor white(.91,.97,.94),muted(.42,.61,.57),mint(.33,1,.75);
     box(0,0,1000,360,FLinearColor(.008,.022,.024,1)); box(0,0,5,360,mint);
     text(25,14,TEXT("ARRIETTY / ROW"),22,mint); text(450,18,Status,18,white);
-    const FString labels[]{TEXT("DISTANCE"),TEXT("TIME"),TEXT("SPEED  km/h"),TEXT("HEART  bpm")};
+    const FString speedLabel=MovementMagnification>1?FString::Printf(TEXT("WORLD km/h x%g"),MovementMagnification):TEXT("SPEED  km/h");
+    const FString labels[]{TEXT("DISTANCE"),TEXT("TIME"),speedLabel,TEXT("HEART  bpm")};
     const FString values[]{Distance,Time,Speed,Heart};
     for(int i=0;i<4;++i) { text(25+247*i,73,labels[i],18,muted); text(25+247*i,110,values[i],43,white); }
     box(25,195,950,1,FLinearColor(.07,.17,.16));

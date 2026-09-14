@@ -19,12 +19,15 @@ def main():
     p.add_argument('--refresh-place',action='store_true')
     p.add_argument('--volume',type=float,default=.8)
     p.add_argument('--radius-km',type=float,default=3)
+    p.add_argument('--magnification','--mag',type=float,default=1)
     p.add_argument('--water-level',type=float)
     p.add_argument('--model',default=os.environ.get('ARRIETTY_OPENAI_MODEL','gpt-5.4-mini'))
     p.add_argument('--engine-root',default='C:/Program Files/Epic Games/UE_5.8')
     args=p.parse_args()
     if not math.isfinite(args.volume) or not 0<=args.volume<=1:
         raise PlaceError('Volume must be 0..1')
+    if not math.isfinite(args.magnification) or not 1<=args.magnification<=10:
+        raise PlaceError('Magnification must be 1..10')
     place=resolve_place(args.place,args.model,args.refresh_place)
     label=f"{place['country_ja']}・{place['region_ja']}の{place['name_ja']}"
     if args.resolve_only:
@@ -53,6 +56,7 @@ def main():
     print(f"水面: 海抜 {scene['water_height_msl_m']:.2f} m / Cesium 高さ {scene['water_height_ellipsoid_m']:.2f} m")
     print('水面標高の出典: '+scene['elevation_source'])
     print('地形を表示する場所: '+str(scene_path))
+    print(f'移動倍率: {args.magnification:g}倍（漕ぐ力・旋回・水面と音の強さは等倍）',flush=True)
     if args.prepare_only:
         return 0
     editor=Path(args.engine_root)/'Engine/Binaries/Win64/UnrealEditor.exe'
@@ -76,6 +80,7 @@ def main():
     command=[str(editor),str(project),'/Game/Row/Maps/CesiumRow','-game',
              '-RowPlace='+str(scene_path),'-RowSettings='+str(WORKSPACE/'config/row.local.json'),
              '-RowCesiumConfig='+str(cfg_path),'-RowVolume='+str(args.volume),
+             '-RowMagnification='+str(args.magnification),
              '-abslog='+str(log),'-nosplash','-windowed','-ResX=1600','-ResY=900',
              '-ExecCmds=t.MaxFPS 90,t.IdleWhenNotForeground 0']
     command+=['-RowDemo','-nohmd','-DisablePlugins=OpenXR'] if args.demo else ['-vr']

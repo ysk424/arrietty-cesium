@@ -89,6 +89,16 @@ ARowPawn::ARowPawn() {
 }
 void ARowPawn::BeginPlay() {
     Super::BeginPlay(); Began=row::Devices::seconds();
+    FString magnification;
+    if(FParse::Value(FCommandLine::Get(),TEXT("RowMagnification="),magnification)) {
+        MovementMagnification=FCString::Atod(*magnification);
+        if(!magnification.IsNumeric() || !row::validMagnification(MovementMagnification)) {
+            UE_LOG(LogTemp,Error,TEXT("ROW_OPTIONS_INVALID magnification_requires_1_to_10"));
+            SetActorTickEnabled(false);
+            UKismetSystemLibrary::QuitGame(this,nullptr,EQuitPreference::Quit,false);
+            return; // Reject before opening device workers.
+        }
+    }
     Geography=ARowGeography::Get(GetWorld());
     if(Geography) SetActorRotation(FRotator(0,Geography->GetSpawnYaw(),0));
     Home=GetActorTransform(); Home.SetLocation(FVector(GetActorLocation().X,GetActorLocation().Y,0)); SetActorTransform(Home);
@@ -141,7 +151,7 @@ void ARowPawn::BeginPlay() {
         KeyInput=MakeShared<FRowKeyInput>(this);
         FSlateApplication::Get().RegisterInputPreProcessor(KeyInput,0);
     }
-    UE_LOG(LogTemp,Display,TEXT("ROW_READY offline=%d demo=%d reference_water_z_cm=0"),Offline,Demo);
+    UE_LOG(LogTemp,Display,TEXT("ROW_READY offline=%d demo=%d reference_water_z_cm=0 movement_magnification=%g"),Offline,Demo,MovementMagnification);
 }
 void ARowPawn::SetupPlayerInputComponent(UInputComponent* input) {
     Super::SetupPlayerInputComponent(input);
@@ -232,7 +242,7 @@ void ARowPawn::FinishCalibration(const row::Input& in) {
     if(SessionFile.IsEmpty()) {
         const FString dir=FPaths::ProjectSavedDir()/TEXT("Sessions"); IFileManager::Get().MakeDirectory(*dir,true);
         SessionFile=dir/FString::Printf(TEXT("row-%s.csv"),*FDateTime::UtcNow().ToString(TEXT("%Y%m%dT%H%M%S%ss")));
-        FFileHelper::SaveStringToFile(TEXT("utc,event,active_s,distance_m,speed_kmh,heart_bpm,strokes,source,machine_distance_m,machine_elapsed_s,machine_speed_kmh,power_w,lean_cm,steer,yaw_deg_s,resistance_level,power_multiplier,game_power_w,bar_source,bar_gap_s,tracking_issue\n"),*SessionFile);
+        FFileHelper::SaveStringToFile(TEXT("utc,event,active_s,distance_m,speed_kmh,heart_bpm,strokes,source,machine_distance_m,machine_elapsed_s,machine_speed_kmh,power_w,lean_cm,steer,yaw_deg_s,resistance_level,power_multiplier,game_power_w,bar_source,bar_gap_s,tracking_issue,movement_magnification,world_speed_kmh,resistance_raw,resistance_age_s\n"),*SessionFile);
     }
     Notice.Empty(); Record(TEXT("start"));
     UE_LOG(LogTemp,Display,TEXT("ROW_CONTROL action=start"));
@@ -293,7 +303,7 @@ void ARowPawn::Tick(float dt) {
         }
     }
     // Pose derivatives use the real frame interval; a hitch invokes core watchdog.
-    const double moved=oldState==row::State::Calibrating?0:Model.tick(in,dt);
+    const double moved=oldState==row::State::Calibrating?0:Model.tick(in,dt,MovementMagnification);
     if(Model.state==row::State::Running) SimTime+=dt;
     if(oldState==row::State::Running && (oldBarSource!=Model.barTracking.source || Model.state==row::State::TrackingLost)) {
         Record(Model.state==row::State::TrackingLost?TEXT("tracking_lost"):TEXT("bar_source_changed"));
@@ -306,15 +316,28 @@ void ARowPawn::Tick(float dt) {
         FHitResult hit;
         FCollisionQueryParams params(SCENE_QUERY_STAT(RowBank),false,this);
         const FVector from=GetActorLocation()+FVector(0,0,35);
-        const FVector next=GetActorLocation()+delta;
-        bool mappedWater=!Geography || (Geography->CanNavigate(next) && Geography->CanNavigate(next+delta.GetSafeNormal()*250));
-        const bool collision=GetWorld()->SweepSingleByChannel(hit,from,from+delta,FQuat::Identity,ECC_WorldStatic,FCollisionShape::MakeSphere(30),params);
-        const bool exposedTerrain=collision && (!Geography || hit.ImpactPoint.Z>Geography->SurfaceHeightCm(hit.ImpactPoint.X,hit.ImpactPoint.Y)+3);
+        FVector next=GetActorLocation()+delta;
+        const bool mappedWater=!Geography || Geography->CanNavigatePath(GetActorLocation(),next+delta.GetSafeNormal()*250);
+        if(Geography) next.Z=Geography->SurfaceHeightCm(next.X,next.Y);
+        // Keep each mesh sweep short at higher magnification and follow the
+        // curved mean water. Retain the existing hidden-imagery tolerance.
+        bool exposedTerrain=false;
+        FVector sweepFrom=from;
+        const int steps=FMath::Max(1,FMath::CeilToInt(delta.Size()/50.));
+        for(int i=1;i<=steps;++i) {
+            FVector sweepTo=GetActorLocation()+delta*(double(i)/steps);
+            if(Geography) sweepTo.Z=Geography->SurfaceHeightCm(sweepTo.X,sweepTo.Y);
+            sweepTo.Z+=35;
+            const bool collision=GetWorld()->SweepSingleByChannel(hit,sweepFrom,sweepTo,FQuat::Identity,ECC_WorldStatic,FCollisionShape::MakeSphere(30),params);
+            if(collision && (!Geography || hit.ImpactPoint.Z>Geography->SurfaceHeightCm(hit.ImpactPoint.X,hit.ImpactPoint.Y)+3)) {
+                exposedTerrain=true; break;
+            }
+            sweepFrom=sweepTo;
+        }
         if(!mappedWater || exposedTerrain) {
             Model.distance-=moved; Model.pause(); Notice=TEXT("Shore / paused"); Record(TEXT("shore"));
         } else {
-            AddActorWorldOffset(delta);
-            if(Geography) { auto p=GetActorLocation(); p.Z=Geography->SurfaceHeightCm(p.X,p.Y); SetActorLocation(p); }
+            SetActorLocation(next);
             AddActorWorldRotation(FRotator(0,FMath::RadiansToDegrees(Model.heading-oldHeading),0));
         }
     }
@@ -333,7 +356,8 @@ void ARowPawn::Tick(float dt) {
     if(Panel) {
         Panel->Distance=FString::Printf(TEXT("%.0f m"),Model.distance);
         const int seconds=int(Model.elapsed); Panel->Time=FString::Printf(TEXT("%02d:%02d"),seconds/60,seconds%60);
-        Panel->Speed=FString::Printf(TEXT("%.1f"),Model.speed*3.6);
+        Panel->MovementMagnification=MovementMagnification;
+        Panel->Speed=FString::Printf(TEXT("%.1f"),Model.speed*3.6*MovementMagnification);
         const auto hr=Snapshot.heart;
         Panel->Heart=hr.fresh(in.now,5) && hr.value>0?FString::Printf(TEXT("%.0f"),hr.value):TEXT("--");
         const TCHAR* rowing=Model.barTracking.source==row::BarSource::Imu?TEXT("ROWING / WIT IMU"):
@@ -394,12 +418,17 @@ void ARowPawn::Record(const TCHAR* event) {
     const FString resistance=output.resistance>=1?FString::Printf(TEXT("%.0f"),output.resistance):FString();
     const FString game=output.usingBt || estimateAvailable?FString::Printf(TEXT("%.3f"),output.gameWatts):FString();
     const FString machinePower=output.usingBt?FString::Printf(TEXT("%.3f"),output.machineWatts):FString();
-    const FString line=FString::Printf(TEXT("%s,%s,%.3f,%.3f,%.3f,%s,%u,%s,%s,%s,%s,%s,%.2f,%.3f,%.3f,%s,%.0f,%s,%s,%.3f,%s\n"),
+    // Preserve invalid/stale dial observations for diagnosis without using them
+    // as power gain. No identity, raw BLE payload or device command is recorded.
+    const bool haveResistance=t.resistance.received>=0 && FMath::IsFinite(t.resistance.value);
+    const FString rawResistance=haveResistance?FString::Printf(TEXT("%.0f"),t.resistance.value):FString();
+    const FString resistanceAge=haveResistance?FString::Printf(TEXT("%.3f"),now-t.resistance.received):FString();
+    const FString line=FString::Printf(TEXT("%s,%s,%.3f,%.3f,%.3f,%s,%u,%s,%s,%s,%s,%s,%.2f,%.3f,%.3f,%s,%.0f,%s,%s,%.3f,%s,%g,%.3f,%s,%s\n"),
         *FDateTime::UtcNow().ToIso8601(),event,Model.elapsed,Model.distance,Model.speed*3.6,*hr,Model.strokes,
         Demo?TEXT("demo"):output.usingBt?TEXT("bt"):UseImu?TEXT("imu_estimate"):Model.barTracking.source==row::BarSource::HmdAssist?TEXT("hmd_estimate"):TEXT("tracker_estimate"),*value(t.distance),*value(t.elapsed),*speed,*machinePower,
         Model.lean*100,Model.steer,FMath::RadiansToDegrees(Model.yawRate),*resistance,output.multiplier,*game,
         UTF8_TO_TCHAR(row::barSourceName(Model.barTracking.source)),Model.barTracking.gapSeconds,
-        UTF8_TO_TCHAR(row::trackingIssueName(Model.barTracking.issue)));
+        UTF8_TO_TCHAR(row::trackingIssueName(Model.barTracking.issue)),MovementMagnification,Model.speed*3.6*MovementMagnification,*rawResistance,*resistanceAge);
     FFileHelper::SaveStringToFile(line,*SessionFile,FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM,&IFileManager::Get(),FILEWRITE_Append);
 }
 void ARowPawn::EndPlay(const EEndPlayReason::Type reason) {
