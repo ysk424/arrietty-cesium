@@ -31,11 +31,11 @@ TSharedRef<SWidget> UArriettySetup::RebuildWidget()
         [SNew(STextBlock).AutoWrapText(true).Font(Font)
             .Text_Lambda([this]{return FText::FromString(Pawn?Pawn->SetupMessage:TEXT(""));})]
         +SVerticalBox::Slot().AutoHeight().Padding(0,0,0,12)
-        [SNew(SButton).Text(FText::FromString(TEXT("Start simulator (P)")))
-            .IsEnabled_Lambda([this]{return Pawn && Pawn->WorldReady && !Pawn->bSetupDirty;})
+        [SNew(SButton).Text(FText::FromString(TEXT("Resume preparation after stop")))
+            .IsEnabled_Lambda([this]{return Pawn && Pawn->CanResumePreparation();})
             .OnClicked_Lambda([this]{if(Pawn)Pawn->StartSimulation();return FReply::Handled();})]
         +SVerticalBox::Slot().AutoHeight()
         [SNew(STextBlock).AutoWrapText(true).Font(FCoreStyle::GetDefaultFontStyle("Regular",12))
-            .Text(FText::FromString(TEXT("Button 1: align and start\nEsc: return here to change the date/time\nClose the window to exit")))]
+            .Text(FText::FromString(TEXT("Preparation starts automatically when terrain is ready.\nButton 1: look forward, align and start\nEsc: stop and return here; no automatic restart\nClose the window to exit")))]
     ];
 }

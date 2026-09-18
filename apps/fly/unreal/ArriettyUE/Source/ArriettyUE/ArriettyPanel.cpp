@@ -27,12 +27,12 @@ int32 UArriettyPanel::NativePaint(const FPaintArgs& Args, const FGeometry& G,
     if (!bPlaying || !Telemetry.IsValid())
     {
         Text(60,100,TEXT("CESIUM / FLY"),32);
-        Text(60,165,TEXT("P  Start simulator"),24);
-        Text(60,215,TEXT("Button 1  Align HMD + centered VIVE handle"),22);
+        Text(60,165,TEXT("Automatic preparation / Button 1 to ride"),24);
+        Text(60,215,TEXT("Button 1  Look forward + center steering to start"),22);
         Text(60,265,TEXT("Button 2  Ground / flight    Button 6  Brake"),22);
         Text(60,315,TEXT("Button 3 / 4  Roll    Both  Pitch up"),22);
         Text(60,365,TEXT("Button 5  PTT    Esc  Return to setup"),22);
-        Text(60,408,TEXT("R  Realign HMD + centered handle during a ride"),22);
+        Text(60,408,TEXT("R  Realign view    J1  Steering / rudder (default)"),22);
         Text(60,450,TEXT("Cesium World Terrain | OpenStreetMap contributors / ODbL"),14);
         return L+3;
     }

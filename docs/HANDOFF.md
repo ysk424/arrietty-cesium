@@ -1,4 +1,36 @@
-# Current handoff — 2026-09-15
+# Current handoff — 2026-09-19
+
+Follow-up: the user requested removing P because taking Quest off to inspect the
+desktop blanks its view. Fly now automatically enters device preparation after
+terrain readiness, bridge handshake and applied time settings. Button 1 still
+aligns the actual view and starts the ride. Quest/VIVE share the same UI; changing
+HMD never selects the legacy tracker source. Esc/watchdog stops remain stopped
+until explicit setup resume. PrepareOnly and Smoke retain their prior boundaries.
+The user said the other behavior was OK; no detailed live acceptance measurements
+were supplied. See VALIDATION for the new native automatic-preparation test.
+
+Fly defaults to wired panel Joystick 1 for ground steering and airborne rudder.
+UE still owns HMD presentation/alignment through the active OpenXR runtime;
+the launcher no longer requires SteamVR. Joystick mode starts no OpenVR worker.
+The user identifies the left of two physical sticks as Joystick 1; actual axis
+and direction still need a live check. Private `joystick1_steering_axis=x|y`
+and `joystick1_steering_invert` allow correction. Default x-positive means right.
+Private `steering_input=vive` retains the accepted legacy handle path.
+
+Neutral deadzone is 15%; deflection maps to the inherited +/-15 degree input,
+with unchanged bank-plus-rudder physics. Worker reception timestamps gate stale
+serial samples at 0.5 s. Missing/stale/disconnected input stops motion, fan and
+audio; start, R/alignment, reconnect and tuning exit require neutral again.
+Joystick 1 SW tuning remains available with rudder zero while tuning; Joystick 2,
+buttons, T2 controls, view-forward alignment, terrain and shutdown remain intact.
+See FLY_OPENXR.ja.md, INTEGRATION and VALIDATION for checks and limitations.
+Both Windows OpenXR registry views point to Meta on this PC. No sibling files
+or registry settings were changed. Quest display and physical stick acceptance
+are still unverified. The user requested publication on 2026-09-19 after these
+changes and confirmed the Codex completion beep was audible and useful. That
+notification feedback is separate from Fly audio or live VR acceptance.
+
+## Previous handoff — 2026-09-15
 
 Row now supports root `-mag` / `-Magnification` 1..10 (default 1, decimals),
 Python `--mag` / `--magnification`, and UE `-RowMagnification`. Only the final

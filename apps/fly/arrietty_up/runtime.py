@@ -26,6 +26,7 @@ from .instruments import update_upbge_panel
 from .models import CscSample, FlightState
 from .serial_controller import ControllerEventType, SerialController
 from .steering import SteeringController
+from .joystick_steering import JoystickSteering
 from .trainer_protocol import effective_speed_kmh
 from .voice import VoiceBridge
 
@@ -53,7 +54,7 @@ class RuntimeState:
     tuning_controls: FlightTuningControls = field(default_factory=FlightTuningControls)
     serial: SerialController = field(default_factory=SerialController)
     bluetooth: BluetoothManager = field(default_factory=BluetoothManager)
-    steering: SteeringController = field(default_factory=SteeringController)
+    steering: SteeringController | JoystickSteering = field(default_factory=SteeringController)
     fan: FanController = field(default_factory=FanController)
     voice: VoiceBridge = field(default_factory=VoiceBridge)
     button_edges: ButtonEdgeLatch = field(default_factory=ButtonEdgeLatch)
@@ -265,6 +266,8 @@ class RuntimeState:
         self.controller_button_mask = sample.button_mask
         self.joystick1_axes = sample.joystick1
         self.joystick2_axes = sample.joystick2
+        if isinstance(self.steering, JoystickSteering):
+            self.steering.receive(sample, now_seconds)
         self.set_brake_button_held(bool(sample.button_mask & 0x20))
         pressed = 0 if transition is None else transition.pressed
         changed = 0 if transition is None else transition.pressed | transition.released
@@ -561,8 +564,12 @@ class RuntimeState:
             return max(0.0, self.flight.airspeed_meters_per_second * 3.6)
         return max(0.0, self.ground_speed_kmh)
 
-    def update_steering_state(self) -> None:
-        snapshot = self.steering.snapshot()
+    def update_steering_state(self, now_seconds=None) -> None:
+        if isinstance(self.steering, JoystickSteering):
+            self.steering.set_tuning(self.tuning_controls.active)
+            snapshot = self.steering.snapshot(now_seconds)
+        else:
+            snapshot = self.steering.snapshot()
         self.steering_tracking = snapshot.tracking
         self.steering_status = snapshot.status
         self.steering_message = snapshot.message

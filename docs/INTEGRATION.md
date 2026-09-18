@@ -132,10 +132,31 @@ steering, controls, water and audio stay intact. Stale IMU >=.25 s stops the rid
 without HMD handle assistance or auto-restart. See ROW_IMU.ja.md for limitations.
 
 Python still owns flight dynamics and hardware workers. UE still owns OpenXR,
-camera alignment and UI. P enables device preparation only after geography is
-ready. Button 1 latches the actual view's horizontal forward; R realigns without
-moving or resetting elapsed time. HMD/handle invalidity stops motion and airflow.
+camera alignment and UI. Initial device preparation starts automatically only
+after geography is ready, a fresh authenticated bridge reply is received and
+any edited date/time is applied. No P key is required for either Quest or VIVE.
+This starts device preparation, not movement: Button 1 still latches the actual
+view's horizontal forward; R realigns without
+moving or resetting elapsed time. Fly's default steering source is wired panel
+Joystick 1, independent of UE's active OpenXR runtime. The serial worker timestamps
+samples at reception; samples queued for >=0.5 s are rejected. Missing, disconnected
+or >=0.5 s stale input stops motion and airflow. Centre within 15% is required after
+start, alignment, disconnect/staleness and tuning exit. Axis x (default positive
+right) or y and inversion are private settings. Deflection beyond the deadzone
+maps continuously to the inherited +/-15 degree steering input; the same input
+drives ground steering and airborne rudder, retaining the bank-plus-rudder model.
+Joystick 2 and Button 3/4 controls are unchanged. Joystick 1 SW retains tuning;
+while tuning, fresh panel input is still required but rudder is zero. Exiting
+tuning requires neutral again. No automatic BLE load or fan-response changes.
+The optional `steering_input=vive` retains the old handle tracking/recenter worker;
+only that source initializes OpenVR. HMD or selected steering-source invalidity
+stops motion and airflow. The Fly launcher no longer requires vrserver.exe;
+Quest Link uses Meta OpenXR, VIVE uses SteamVR OpenXR. Row is unchanged.
 The source watchdog and Esc/window-close cleanup remain in place.
+Esc or the source watchdog consumes the one-time automatic start so stopped
+devices cannot silently restart. The setup UI retains explicit resume after
+such a stop. PrepareOnly never auto-starts devices; Smoke retains its isolated
+offline schedule. HMD selection never changes this UI or selects VIVE steering.
 
 Local time uses timezonefinder and IANA tzdata, including summer time. Ambiguous
 or nonexistent DST clock times are rejected. NOAA solar mathematics was copied

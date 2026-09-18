@@ -9,7 +9,7 @@ class ARRIETTYUE_API UArriettyPanel : public UUserWidget
     GENERATED_BODY()
 public:
     TSharedPtr<FJsonObject> Telemetry;
-    FString Status = TEXT("P: START   ESC: SETUP");
+    FString Status = TEXT("AUTOMATIC PREPARATION | ESC: SETUP");
     bool bPlaying = false;
 protected:
     virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& Geometry,

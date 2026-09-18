@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import ctypes
 from ctypes import wintypes
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 import os
 from queue import Empty, SimpleQueue
@@ -33,6 +33,7 @@ class ControllerEvent:
     message: str = ""
     sample: ControllerSample | None = None
     port: str = ""
+    received_at: float = field(default_factory=time.monotonic)
 
 
 class SerialPort(Protocol):

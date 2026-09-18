@@ -26,9 +26,8 @@ def launch_scene(path, scene, *, engine_root, offline=False, smoke=False, headle
     if not editor.is_file() or not (project.parent/'Content/Maps/CesiumFly.umap').is_file():
         raise PlaceError('tools/prepare.ps1 -App Fly を実行してください。')
     cfg,token=cesium_configuration()
-    if hardware:
-        running=subprocess.check_output(['tasklist','/FI','IMAGENAME eq vrserver.exe','/NH'],creationflags=subprocess.CREATE_NO_WINDOW)
-        if b'vrserver.exe' not in running.lower(): raise PlaceError('SteamVR を起動してから fly.ps1 を実行してください。')
+    # UE owns the active OpenXR runtime (Meta Link, SteamVR, etc.). The wired
+    # panel and trainer do not require a SteamVR process.
     # Keep the accepted exclusive bridge port; never connect to someone else's session.
     with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as probe:
         probe.setsockopt(socket.SOL_SOCKET,socket.SO_EXCLUSIVEADDRUSE,1)
@@ -66,7 +65,7 @@ def launch_scene(path, scene, *, engine_root, offline=False, smoke=False, headle
                 if 'ARRIETTY_UE_BRIDGE_READY' in (logs/(prefix+'-bridge.log')).read_text(encoding='utf-8'): break
                 time.sleep(.1)
             else: raise PlaceError('飛行ブリッジの起動がタイムアウトしました。')
-            print('Cesium の標高と周辺地形を読み込んでいます。準備後に P、Button 1 で開始します。',flush=True)
+            print('Cesium の標高と周辺地形を読み込んでいます。機器準備は自動で進みます。正面を見て Button 1 で開始します。',flush=True)
             app=subprocess.Popen(command,cwd=APP,env=env)
             try: result=app.wait(timeout=300 if smoke or prepare_only else None)
             except subprocess.TimeoutExpired: raise PlaceError('地形の準備またはテストがタイムアウトしました。') from None

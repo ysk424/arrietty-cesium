@@ -30,6 +30,7 @@ private:
     friend class FArriettyCesiumCoordinatesTest;
     friend class FArriettyHmdAlignmentTest;
     friend class FArriettyTerrainSweepTest;
+    friend class FArriettyAutomaticStartTest;
     UPROPERTY() TObjectPtr<class ACesiumGeoreference> Geo;
     UPROPERTY() TObjectPtr<class ACesium3DTileset> Terrain;
     bool Ready=false,Failed=false,OriginSet=false,Pending=false,AirStart=false;

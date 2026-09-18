@@ -1,4 +1,7 @@
 {
   "trainer_address": "",
-  "steering_serial": ""
+  "steering_serial": "",
+  "steering_input": "joystick1",
+  "joystick1_steering_axis": "x",
+  "joystick1_steering_invert": false
 }

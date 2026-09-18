@@ -22,7 +22,8 @@ from arrietty_geo import solar
 from arrietty_up.runtime import RuntimeState, _update_navigation
 from arrietty_up.controller_protocol import ControllerSample
 from arrietty_up.serial_controller import ControllerEventType
-from arrietty_up.steering import SteeringSnapshot
+from arrietty_up.steering import SteeringSnapshot, TRACKING_STALE_SECONDS
+from arrietty_up.joystick_steering import JoystickSteering, configured_steering
 from arrietty_up.flight_log import FlightLog
 from arrietty_up.instruments import build_readout
 
@@ -111,7 +112,7 @@ class Simulation:
                 self.apply_error = ""
             except (OSError, ValueError, TypeError) as error:
                 self.apply_error = str(error)
-        return {"playing": False, "status": "P: START | ESC: SETUP",
+        return {"playing": False, "status": "AUTO PREPARATION | ESC: SETUP",
                 "apply_id": self.apply_id, "apply_error": self.apply_error,
                 "local_time": self.world.get('local_time',''),
                 "sun_azimuth": self.world.get('sun_azimuth',277.36),
@@ -131,6 +132,8 @@ class Simulation:
             s.flight.altitude_meters=self.world["start_agl_m"] if self.world["start_mode"]=="air" else 0.
             if self.terrain.origin:
                 self.world.update(origin_longitude=self.terrain.origin[0],origin_latitude=self.terrain.origin[1],origin_ellipsoid_m=self.terrain.origin[2])
+        if self.hardware:
+            s.steering = configured_steering()
         self.state = s
         self.applied_alignment_id = 0
         s.serial.start()
@@ -201,8 +204,13 @@ class Simulation:
             if event.message:
                 self.controller_status = event.message
             if event.type is ControllerEventType.SAMPLE and event.sample is not None:
-                self.controller(event.sample, now)
+                if now - event.received_at < TRACKING_STALE_SECONDS:
+                    # A worker may publish just after this frame captured now.
+                    self.controller(event.sample, min(now, event.received_at))
             elif event.type is ControllerEventType.DISCONNECTED:
+                if isinstance(s.steering, JoystickSteering):
+                    s.steering.disconnect()
+                s.button_edges = type(s.button_edges)()
                 s.set_brake_button_held(False)
                 s.voice.set_ptt_held(False)
                 s.ptt_held = False
@@ -239,7 +247,7 @@ class Simulation:
                 s.steering.recenter()
                 print(f"ARRIETTY_UE_FORWARD id={self.alignment_id} bearing={bearing % 360:.3f}", flush=True)
         s.hmd_aligned = aligned
-        s.update_steering_state()
+        s.update_steering_state(now)
         if not self.hardware:
             s.effective_steering_degrees = max(-35, min(35, float(packet.get("steer", 0))))
         s.xr_bridge_status = "UE OPENXR" if self.hardware else "UE OFFLINE"

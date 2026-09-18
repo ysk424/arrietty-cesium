@@ -80,7 +80,7 @@ void AArriettyPawn::BeginPlay()
     if(bOffline) { Camera->bLockToHmd=false; Camera->SetRelativeLocation(FVector(0,0,160)); Camera->SetRelativeRotation(FRotator(-15,0,0)); }
     else UHeadMountedDisplayFunctionLibrary::SetTrackingOrigin(EHMDTrackingOrigin::LocalFloor);
     Geography=AArriettyWorld::Get(GetWorld());
-    if(Panel) Panel->Status=bOffline?TEXT("OFFLINE | P: START"):TEXT("READY | P: START");
+    if(Panel) Panel->Status=TEXT("PREPARING | AUTOMATIC START");
     FString SolarData;
     TSharedPtr<FJsonObject> Solar;
     if(FFileHelper::LoadFileToString(SolarData,*FPlatformMisc::GetEnvironmentVariable(TEXT("ARRIETTY_UE_SOLAR"))) &&
@@ -130,6 +130,33 @@ void AArriettyPawn::Send(bool Quit)
     FTCHARToUTF8 Bytes(*Json); int32 Sent; Socket->SendTo(reinterpret_cast<const uint8*>(Bytes.Get()),Bytes.Length(),Sent,*Remote);
 }
 
+void AArriettyPawn::StartSimulation()
+{
+    if(!bSetupDirty && WorldReady)
+    {
+        bPlaying=true;
+        bAutoStartPending=false;
+    }
+}
+
+void AArriettyPawn::StopSimulation()
+{
+    bPlaying=false;
+    bAutoStartPending=false; // Esc/watchdog must stay stopped on later ticks.
+    Aligned=0;
+    PendingAlignment=0;
+}
+
+void AArriettyPawn::UpdateAutomaticStart(double Now,bool PrepareOnly)
+{
+    if(bAutoStartPending && !bSmoke && !PrepareOnly && LastPacket>0 &&
+       Now-LastPacket<=1 && AppliedId==ApplyId)
+    {
+        StartSimulation();
+        if(bPlaying) UE_LOG(LogTemp,Display,TEXT("FLY_AUTOMATIC_PREPARATION_READY wait_for_button1=1"));
+    }
+}
+
 void AArriettyPawn::Tick(float Delta)
 {
     Super::Tick(Delta);
@@ -154,8 +181,7 @@ void AArriettyPawn::Tick(float Delta)
     auto PC=Cast<APlayerController>(GetController());
     if(PC)
     {
-        if(PC->WasInputKeyJustPressed(EKeys::P)) StartSimulation();
-        if(PC->WasInputKeyJustPressed(EKeys::Escape)) { bPlaying=false; Aligned=0; PendingAlignment=0; }
+        if(PC->WasInputKeyJustPressed(EKeys::Escape)) StopSimulation();
         if(bPlaying && PC->WasInputKeyJustPressed(EKeys::R))
         {
             ++RecenterId; Aligned=0; PendingAlignment=0;
@@ -163,6 +189,8 @@ void AArriettyPawn::Tick(float Delta)
         if(bOffline) OfflineSpeed=FMath::Clamp(OfflineSpeed+(PC->IsInputKeyDown(EKeys::Up)?8.f:0.f)*Delta-(PC->IsInputKeyDown(EKeys::Down)?8.f:0.f)*Delta,0.f,60.f);
     }
     const double Now=FPlatformTime::Seconds();
+    const bool PrepareOnly=FParse::Param(FCommandLine::Get(),TEXT("FlyPrepareOnly"));
+    UpdateAutomaticStart(Now,PrepareOnly);
     if(Setup)
     {
         Setup->SetVisibility(bPlaying?ESlateVisibility::Collapsed:ESlateVisibility::Visible);
@@ -177,7 +205,6 @@ void AArriettyPawn::Tick(float Delta)
             }
         }
     }
-    const bool PrepareOnly=FParse::Param(FCommandLine::Get(),TEXT("FlyPrepareOnly"));
     if(PrepareOnly && WorldReady) UKismetSystemLibrary::QuitGame(this,PC,EQuitPreference::Quit,false);
     if((bSmoke || PrepareOnly) && (Now-BeganAt>210 || (Geography && Geography->HasFailed()))) {
         UE_LOG(LogTemp,Error,TEXT("FLY_SMOKE_FAILED geography_not_ready"));
@@ -229,6 +256,8 @@ void AArriettyPawn::Tick(float Delta)
         }
         FString TerrainStatus;P->TryGetStringField(TEXT("terrain_status"),TerrainStatus);
         if(Panel) { Panel->Telemetry=P; Panel->bPlaying=Playing; Panel->Status=bOffline?TEXT("OFFLINE | R: ALIGN | ESC: SETUP"):TEXT("LIVE | R: ALIGN | ESC: SETUP"); }
+        bool Ride=false; P->TryGetBoolField(TEXT("ride"),Ride);
+        if(Panel && Playing && !Ride) Panel->Status=TEXT("READY | BUTTON 1: ALIGN AND START");
         if(Panel && !TerrainStatus.IsEmpty()) Panel->Status=TerrainStatus;
         if(!Playing)
         {
@@ -239,8 +268,11 @@ void AArriettyPawn::Tick(float Delta)
                 const FString Error=P->GetStringField(TEXT("apply_error"));
                 if(Error.IsEmpty())
                 {
-                    if(AppliedId==ApplyId) bSetupDirty=false;
-                    SetupMessage=TEXT("Applied: ")+P->GetStringField(TEXT("local_time"));
+                    const FString AppliedTime=P->GetStringField(TEXT("local_time"));
+                    // Initial ACK or an ACK for older edits must not start
+                    // preparation while the rider is still editing the time.
+                    if(AppliedId>0 && AppliedId==ApplyId && SetupDate==AppliedTime.Left(10) && SetupTime==AppliedTime.Mid(11,5)) bSetupDirty=false;
+                    SetupMessage=TEXT("Applied: ")+AppliedTime;
                     const double Azimuth=P->GetNumberField(TEXT("sun_azimuth")),Elevation=P->GetNumberField(TEXT("sun_elevation"));
                     if(Geography) Geography->ApplySun(Azimuth,Elevation);
                     else for(TActorIterator<ADirectionalLight> It(GetWorld());It;++It)
@@ -292,8 +324,8 @@ void AArriettyPawn::Tick(float Delta)
     }
     if(LastPacket>0 && Now-LastPacket>1)
     {
-        bPlaying=false; Aligned=0; PendingAlignment=0;
-        if(Panel) { Panel->Status=TEXT("CONNECTION LOST | P: RESTART"); Panel->bPlaying=false; }
+        StopSimulation();
+        if(Panel) { Panel->Status=TEXT("CONNECTION LOST | RETURN TO SETUP"); Panel->bPlaying=false; }
     }
     auto CurrentAudio=AudioInput;
     const bool Tracked=bOffline || (GEngine->XRSystem.IsValid() && GEngine->XRSystem->IsTracking(IXRTrackingSystem::HMDDeviceId));

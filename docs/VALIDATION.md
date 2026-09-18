@@ -1,4 +1,59 @@
-# Row / Fly integration validation — 2026-09-15
+# Row / Fly integration validation — 2026-09-19
+
+## Fly automatic initial preparation (no P)
+
+- Initial preparation now starts from the real UE pawn tick with no keyboard or
+  HMD-model-specific branch. It requires ready geography, a fresh authenticated
+  bridge response and applied date/time edits. Button 1 and actual view-forward
+  alignment still gate riding. Esc/watchdog consumes the automatic-start latch;
+  the next tick cannot restart stopped devices. Explicit setup resume remains.
+- Rebuilt UE 5.8.2 successfully (logs/fly/auto-preparation-ue-build.log).
+  **120 Python tests and 6 UE tests passed**, including the new
+  Controls.AutomaticPreparation fixture. That fixture ticks live/offline pawns
+  with simulated readiness/bridge state and no BeginPlay/socket/device workers:
+  terrain loading/failure, missing/stale bridge, dirty/pending time, PrepareOnly,
+  Smoke isolation, automatic start, unacknowledged alignment and stop/resume.
+- The first UE automation process stalled during editor startup after loading
+  StylusInputWintab, before any tests ran. Only that owned non-VR test process was
+  stopped. A retry with `-DisablePlugins=OpenXR,StylusInput -NullRHI` completed all
+  six tests with exit 0. This does not establish the cause of the startup stall.
+  Normal launch plugin settings are unchanged. The existing upstream Cesium
+  enum-initialization diagnostic and float warnings remain.
+  Evidence: logs/fly/auto-preparation-stalled-startup.log,
+  logs/fly/auto-preparation-ue-tests.log and logs/fly/python-tests.log.
+- No live ride was running before rebuild. The user reported the other behavior
+  was OK; this new automatic start still needs live Quest/VIVE confirmation.
+
+## Fly wired Joystick 1 / OpenXR separation
+
+- Default live UE bridge selects Joystick 1; explicit `vive` retains the previous
+  handle source. The launcher allows active Meta OpenXR without vrserver.exe.
+  No changes to Row, sibling repositories, global OpenXR selection, BLE loads,
+  fan response, flight constants, geography or audio mixing.
+- New hardware-isolated tests check continuous steering, 15% deadzone, limits,
+  axis/inversion, centre required at start/recenter/reconnect, stale and queued
+  samples, disconnect, tuning suppression/exit, actual ground right-turn sign,
+  airborne bank-plus-rudder response, HMD gating, geography-before-hardware and
+  default/legacy selection. Physical serial/BLE/fan/OpenVR starts are prohibited
+  in the bridge test. Live launcher process creation is intercepted to verify
+  `-vr` without a SteamVR process dependency. Existing N/EOF tests remain.
+- **120 Python tests passed**, including the new joystick and launcher cases.
+  Evidence: logs/fly/python-tests.log. Tests ran from apps/fly using its isolated
+  Python environment; a preliminary root-directory invocation did not resolve
+  the app package and was rerun from the correct working directory.
+- UE 5.8.2 rebuilt successfully; the existing panel float-conversion warnings
+  remain. All five UE tests passed: Audio.Mix, Coordinates.Attitude,
+  Coordinates.HmdAlignment, Coordinates.Cesium and Terrain.Sweep. UE automation
+  uses `-nohmd -DisablePlugins=OpenXR -NullRHI` and opens no hardware workers.
+  Evidence: logs/fly/joystick-ue-build.log and logs/fly/ue-automation.log.
+- Windows 32-bit and 64-bit ActiveRuntime registrations were read and point to
+  the corresponding Meta OpenXR manifests. The shell itself is 32-bit; the
+  64-bit registry was checked explicitly. No Unreal/Arrietty process was running
+  before rebuild. No running ride was interrupted.
+- Quest 3 display, Link stability, physical left/right stick identification,
+  axis polarity, comfortable rudder response, real disconnect behavior and live
+  T2/fan/audio acceptance have **not** been established by these automated tests.
+  FLY_OPENXR.ja.md documents the live check and local axis corrections.
 
 ## Row movement magnification and 16-level check
 

@@ -49,6 +49,66 @@ bool FArriettyAttitudeTest::RunTest(const FString&)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FArriettyAutomaticStartTest,"Arrietty.Controls.AutomaticPreparation",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FArriettyAutomaticStartTest::RunTest(const FString&)
+{
+    const UWorld::InitializationValues Init=UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false);
+    auto World=UWorld::CreateWorld(EWorldType::Game,false,NAME_None,nullptr,true,ERHIFeatureLevel::Num,&Init);
+    auto Geography=World->SpawnActor<AArriettyWorld>();
+    // No BeginPlay, socket, real XR or device worker. Exercise the real pawn
+    // tick without any controller/key input; LastPacket represents a bridge ACK.
+    for(bool Offline : {true,false})
+    {
+        auto Pawn=World->SpawnActor<AArriettyPawn>();
+        Pawn->Geography=Geography; Pawn->bOffline=Offline;
+        Pawn->AttributionAttached=true;
+        Geography->Ready=false;
+        Pawn->Tick(.01f);
+        TestFalse(TEXT("Loading terrain cannot start preparation"),Pawn->bPlaying);
+        Geography->Ready=true;
+        Pawn->Tick(.01f);
+        TestFalse(TEXT("Ready terrain still needs the bridge handshake"),Pawn->bPlaying);
+        Pawn->LastPacket=FPlatformTime::Seconds(); Pawn->AppliedId=0;
+        Geography->Failed=true;
+        Pawn->Tick(.01f);
+        TestFalse(TEXT("Failed geography cannot start devices"),Pawn->bPlaying);
+        Geography->Failed=false;
+        Pawn->bSetupDirty=true;
+        Pawn->Tick(.01f);
+        TestFalse(TEXT("Unapplied time edits prevent automatic preparation"),Pawn->bPlaying);
+        Pawn->bSetupDirty=false; Pawn->ApplyId=1;
+        Pawn->Tick(.01f);
+        TestFalse(TEXT("Pending time ACK prevents preparation"),Pawn->bPlaying);
+        Pawn->AppliedId=1;
+        Pawn->LastPacket=FPlatformTime::Seconds()-2;
+        Pawn->Tick(.01f);
+        TestFalse(TEXT("Stale bridge cannot start preparation"),Pawn->bPlaying);
+        Pawn->LastPacket=FPlatformTime::Seconds();
+        Pawn->UpdateAutomaticStart(Pawn->LastPacket,true);
+        TestFalse(TEXT("PrepareOnly never starts devices"),Pawn->bPlaying);
+        Pawn->bSmoke=true;
+        Pawn->UpdateAutomaticStart(Pawn->LastPacket,false);
+        TestFalse(TEXT("Smoke retains its own schedule"),Pawn->bPlaying);
+        Pawn->bSmoke=false;
+        Pawn->Tick(.01f);
+        TestTrue(TEXT("Ready live/offline pawn starts without P or HMD input"),Pawn->bPlaying);
+        TestFalse(TEXT("Automatic preparation is consumed once"),Pawn->bAutoStartPending);
+        TestEqual(TEXT("Preparation does not acknowledge Button 1 alignment"),Pawn->Aligned,0);
+        Pawn->Aligned=7; Pawn->PendingAlignment=8;
+        Pawn->StopSimulation();
+        Pawn->Tick(.01f);
+        TestFalse(TEXT("Esc/watchdog stop cannot restart on next tick"),Pawn->bPlaying);
+        TestEqual(TEXT("Stop clears alignment"),Pawn->Aligned,0);
+        TestEqual(TEXT("Stop clears pending alignment"),Pawn->PendingAlignment,0);
+        TestTrue(TEXT("Explicit resume is available after stopping"),Pawn->CanResumePreparation());
+        Pawn->StartSimulation();
+        TestTrue(TEXT("Setup resume still works after an explicit stop"),Pawn->bPlaying);
+        Pawn->Destroy();
+    }
+    World->DestroyWorld(false);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FArriettyHmdAlignmentTest,"Arrietty.Coordinates.HmdAlignment",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FArriettyHmdAlignmentTest::RunTest(const FString&)
 {
