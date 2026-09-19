@@ -22,6 +22,16 @@ project extracts its own plugin build tree from the same verified archive.
 
 ## Height and coordinate contract
 
+Optional locally purchased Waterline Gen 4 content supplies GPU waves/materials
+through RowWater. ROW retains the geographic mesh, curved mean datum, water/hull
+masks and speed/drive wakes. Vertical-only vendor displacement is added to the
+curved mean. Vendor buoyancy, drag, underwater and shallow-water simulation are
+disabled; no vendor camera/input owns the ride. One vendor actor produces shared
+wave textures; per-eye rendering remains UE's responsibility. OpenXR stereo
+acceptance is still pending. Root `-LegacyWater` / Python `--legacy-water` /
+UE `-RowLegacyWater` select original water. Test fixtures use original water so
+control regression tests never require proprietary content. See ROW_WATERLINE.ja.md.
+
 Row supports `-Magnification` / `-mag` (1..10, default 1, decimals allowed),
 forwarded as `--magnification` (`--mag` also accepted by Python) and
 `-RowMagnification` to UE. The rowing model scales only the final horizontal

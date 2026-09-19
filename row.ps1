@@ -2,6 +2,7 @@
 param(
     [Parameter(Mandatory=$true,Position=0)][ValidateNotNullOrEmpty()][string]$Place,
     [switch]$Demo,
+    [switch]$LegacyWater,
     [switch]$ResolveOnly,
     [switch]$PrepareOnly,
     [switch]$RefreshPlace,
@@ -20,6 +21,7 @@ $launchArgs=@((Join-Path $PSScriptRoot 'apps/row/tools/launch.py'),$Place,'--eng
     '--volume',$Volume.ToString($culture),'--radius-km',$RadiusKm.ToString($culture),
     '--magnification',$Magnification.ToString($culture))
 if($Demo){$launchArgs+='--demo'}
+if($LegacyWater){$launchArgs+='--legacy-water'}
 if($ResolveOnly){$launchArgs+='--resolve-only'}
 if($PrepareOnly){$launchArgs+='--prepare-only'}
 if($RefreshPlace){$launchArgs+='--refresh-place'}

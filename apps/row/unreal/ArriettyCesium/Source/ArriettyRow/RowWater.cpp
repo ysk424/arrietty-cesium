@@ -7,6 +7,89 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "EngineUtils.h"
 #include "Math/Float16Color.h"
+#include "Components/MeshComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetRenderingLibrary.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Misc/PackageName.h"
+#include "UObject/UnrealType.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
+
+void ARowWater::StartWaterline() {
+    if(FParse::Param(FCommandLine::Get(),TEXT("RowLegacyWater")) ||
+       FParse::Param(FCommandLine::Get(),TEXT("RowTestFixture"))) return;
+    if(!FPackageName::DoesPackageExist(TEXT("/Game/Row/Waterline/MI_RowWaterline"))) return;
+    auto material=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Row/Waterline/MI_RowWaterline.MI_RowWaterline"));
+    if(!material) return; // Optional locally purchased content.
+    auto cls=LoadClass<AActor>(nullptr,TEXT("/Game/Waterline/3_Ocean_Sim/BP_Waterline_Ocean_Gen_4.BP_Waterline_Ocean_Gen_4_C"));
+    if(!cls) { UE_LOG(LogTemp,Error,TEXT("ROW_WATERLINE_MISSING_CLASS")); return; }
+    Waterline=GetWorld()->SpawnActorDeferred<AActor>(cls,FTransform::Identity,this);
+    if(!Waterline) return;
+    bool valid=true;
+    auto boolean=[&](const TCHAR* name,bool value) {
+        auto p=FindFProperty<FBoolProperty>(cls,name);
+        if(p) p->SetPropertyValue_InContainer(Waterline,value); else valid=false;
+    };
+    auto number=[&](const TCHAR* name,double value) {
+        auto p=FindFProperty<FNumericProperty>(cls,name);
+        if(p && p->IsFloatingPoint()) p->SetFloatingPointPropertyValue(p->ContainerPtrToValuePtr<void>(Waterline),value);
+        else valid=false;
+    };
+    // The vendor actor computes waves only. ROW owns movement, water datum,
+    // hull exclusion, rowing wakes and camera. No vendor buoyancy or input.
+    for(auto name:{TEXT("Use Buoyancy"),TEXT("Use Ocean Buoyancy"),TEXT("Use Shore Buoyancy"),
+                   TEXT("Use Drag Functions"),TEXT("Enable Shallow Water Sim"),TEXT("Use Underwater VFX"),
+                   TEXT("Underwater Surface Enable"),TEXT("Volumetric Fog Enable"),
+                   TEXT("Run Cascade 2"),TEXT("Run Cascade 3"),TEXT("Run Cascade 4")}) boolean(name,false);
+    number(TEXT("1 Ocean Wave Height"),1.0);
+    number(TEXT("1 Ocean Wave Steepness "),0.0);
+    number(TEXT("1 Micro FFT Displacement Height"),0.0);
+    if(auto p=FindFProperty<FObjectPropertyBase>(cls,TEXT("1 Water Surface Material")))
+        p->SetObjectPropertyValue_InContainer(Waterline,material);
+    else valid=false;
+    if(!valid) {
+        UE_LOG(LogTemp,Error,TEXT("ROW_WATERLINE_INCOMPATIBLE_PROPERTIES using_original_water"));
+        Waterline->Destroy(); Waterline=nullptr; return;
+    }
+    UGameplayStatics::FinishSpawningActor(Waterline,FTransform::Identity);
+    SyncWaterline();
+    if(!WaterlineMaterial) {
+        UE_LOG(LogTemp,Error,TEXT("ROW_WATERLINE_MATERIAL_UNAVAILABLE using_original_water"));
+        Waterline->Destroy(); Waterline=nullptr; return;
+    }
+    UE_LOG(LogTemp,Display,TEXT("ROW_WATERLINE_CREATED geographic_mesh=1 vendor_buoyancy=0 vendor_underwater=0"));
+}
+void ARowWater::SyncWaterline() {
+    if(!Waterline) return;
+    if(!WaterlineTickOrdered) {
+        auto pc=GetWorld()->GetFirstPlayerController();
+        if(pc && pc->GetPawn()) {
+            pc->GetPawn()->AddTickPrerequisiteActor(Waterline);
+            WaterlineTickOrdered=true;
+        }
+    }
+    TInlineComponentArray<UMeshComponent*> meshes(Waterline);
+    for(auto mesh:meshes) { mesh->SetVisibility(false); mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); }
+    auto p=FindFProperty<FObjectPropertyBase>(Waterline->GetClass(),TEXT("Water Surface DYN"));
+    auto source=p?Cast<UMaterialInstanceDynamic>(p->GetObjectPropertyValue_InContainer(Waterline)):nullptr;
+    if(!source) return;
+    if(!WaterlineMaterial) UE_LOG(LogTemp,Display,TEXT("ROW_WATERLINE_MATERIAL_BOUND material=%s"),*source->GetName());
+    WaterlineMaterial=source;
+    if(LocalMaterial && DistantMaterial) {
+        for(auto m:{LocalMaterial,DistantMaterial}) {
+            m->CopyInterpParameters(source);
+            m->SetTextureParameterValue(TEXT("WakeField"),Field);
+        }
+    }
+}
+void ARowWater::EndPlay(const EEndPlayReason::Type Reason) {
+    if(IsValid(Waterline)) Waterline->Destroy();
+    Waterline=nullptr; WaterlineMaterial=nullptr;
+    Super::EndPlay(Reason);
+}
 
 ARowWater::ARowWater() {
     Patch=CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("LocalWaveSurface")); RootComponent=Patch;
@@ -19,7 +102,9 @@ ARowWater::ARowWater() {
 }
 void ARowWater::BeginPlay() {
     Super::BeginPlay();
+    StartWaterline();
     auto base=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Row/Materials/M_RowWater.M_RowWater"));
+    if(Waterline) base=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Row/Waterline/MI_RowWaterline.MI_RowWaterline"));
     if(!base) { UE_LOG(LogTemp,Error,TEXT("ROW_WATER_MATERIAL_MISSING")); return; }
     Field=UTexture2D::CreateTransient(row::Waves::N,row::Waves::N,PF_FloatRGBA);
     Field->SRGB=false; Field->NeverStream=true; Field->AddressX=TA_Clamp; Field->AddressY=TA_Clamp;
@@ -55,10 +140,12 @@ void ARowWater::BeginPlay() {
     Patch->CreateMeshSection_LinearColor(0,v,tri,n,uv,{}, {},false);
     Patch->SetMaterial(0,LocalMaterial);
     Upload();
+    SyncWaterline();
     UE_LOG(LogTemp,Display,TEXT("ROW_WATER_READY far_actors=%d local_triangles=%d field=256 kelvin=deep_water_fft hz=30 bow_whitewater=speed"),waterActors,tri.Num()/3);
 }
 void ARowWater::UpdateBoat(FVector pos,float heading,float speed,float drive,float dt) {
     if(!LocalMaterial) return;
+    SyncWaterline();
     const double x=pos.X*.01,y=pos.Y*.01;
     static_assert(row::Waves::N==row::KelvinWake::N && row::Waves::Cell==row::KelvinWake::Cell);
     Waves.center(x,y); Kelvin.center(x,y); SetActorLocation(FVector(pos.X,pos.Y,0));
@@ -91,6 +178,24 @@ void ARowWater::UpdateBoat(FVector pos,float heading,float speed,float drive,flo
     }
     const double frame=FMath::Clamp(double(dt),0.,.1);
     WaterTime+=frame;
+    if(Waterline && WaterTime>5 && WaterTime-frame<=5 && FParse::Param(FCommandLine::Get(),TEXT("RowDemo")) &&
+       FParse::Param(FCommandLine::Get(),TEXT("RowWaterlineCheck"))) {
+        auto p=FindFProperty<FObjectPropertyBase>(Waterline->GetClass(),TEXT("1 RT Height"));
+        auto rt=p?Cast<UTextureRenderTarget2D>(p->GetObjectPropertyValue_InContainer(Waterline)):nullptr;
+        TArray<FLinearColor> samples;
+        float low=FLT_MAX,high=-FLT_MAX;
+        if(rt && UKismetRenderingLibrary::ReadRenderTargetRaw(this,rt,samples,false))
+            for(auto c:samples) { low=FMath::Min(low,c.B); high=FMath::Max(high,c.B); }
+        UE_LOG(LogTemp,Display,TEXT("ROW_WATERLINE_GPU_CHECK samples=%d blue_min=%g blue_max=%g local_patch=%g source=%d"),
+            samples.Num(),low,high,LocalMaterial->K2_GetScalarParameterValue(TEXT("LocalPatch")),WaterlineMaterial!=nullptr);
+        UE_LOG(LogTemp,Display,TEXT("ROW_WATERLINE_BINDINGS ocean=%g mask=%s field=%s linear=%s curve=%s source_parameters=%d"),
+            LocalMaterial->K2_GetScalarParameterValue(TEXT("Ocean")),
+            *GetNameSafe(LocalMaterial->K2_GetTextureParameterValue(TEXT("WaterMask"))),
+            *GetNameSafe(LocalMaterial->K2_GetTextureParameterValue(TEXT("WakeField"))),
+            *LocalMaterial->K2_GetVectorParameterValue(TEXT("SurfaceLinear")).ToString(),
+            *LocalMaterial->K2_GetVectorParameterValue(TEXT("SurfaceCurve")).ToString(),
+            WaterlineMaterial?WaterlineMaterial->ScalarParameterValues.Num():0);
+    }
     KelvinAccumulator+=frame;
     while(KelvinAccumulator>=row::KelvinWake::Step) {
         // Sample the travelled segment near the middle of each fixed step.

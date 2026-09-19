@@ -1,5 +1,43 @@
 # Row / Fly integration validation — 2026-09-19
 
+## ROW Waterline Gen 4 local integration
+
+- User reported trying the build and requested publication on 2026-09-19.
+  Headset, duration and detailed visual/performance results were not specified;
+  this report does not establish every remaining VR acceptance check below.
+
+- UE 5.8.2 Editor Development rebuild succeeded. Local material generation and
+  repeat generation succeeded; source Waterline content and project settings
+  were not edited. Purchased and generated assets remain Git-ignored.
+- Inspected DX12 non-VR renders: waterline-final-ocean.png and
+  waterline-final-lake.png under apps/row/artifacts. Waterline waves are visible
+  on ROW meshes. GPU diagnostic readback confirmed a nonconstant 512x512 height
+  texture during development. Diagnostic readback now requires both -RowDemo
+  and -RowWaterlineCheck and is absent from normal operation.
+- Moraine Lake retained EGM96 water datum, existing bounded terrain alignment
+  and readiness gate. Synthetic calibration completed; CSV reached 57.233 m,
+  nine strokes and 24.167 active seconds before a frame gap stopped motion.
+  Ocean's first final preview stopped calibration at dt=0.1780 s. No watchdog
+  was relaxed. These are visual/function checks, not uninterrupted performance
+  acceptance. Terrain streaming and capture stalls have not been profiled.
+- A subsequent sea render (waterline-ocean-wake.png) completed calibration and
+  reached 14.400 m before a frame gap near screenshot capture. To isolate the
+  capture path, ran a 50-second sea preview without screenshots: normal exit,
+  31.918 active seconds, 80.627 m and 11 strokes, tracking_issue=none. Evidence:
+  logs/row/waterline/ocean-no-capture.log and private session CSV. This supports
+  screenshot readback as a stall source but is not a VR frame-time benchmark.
+- `tools/test.ps1 -App Row`: **472 native checks, 14 Python tests and 3 UE
+  automation tests passed**. Extended launcher tests verify default selection
+  and -LegacyWater transport through PowerShell/Python. Control fixtures use
+  original water and therefore do not validate Waterline or stereo rendering.
+  Evidence: logs/row/waterline/regression.log and
+  logs/row/setup-controls-20260919-143021.log.
+- No live ride was running before imports/builds. OpenXR and hardware were
+  disabled for previews/tests. Quest 3 / VIVE left/right consistency, sustained
+  frame timing, long-distance seams and live wake appearance remain unverified.
+  Existing Cesium metadata enum initialization warnings remain in engine logs;
+  no Waterline material compile or Blueprint runtime error was observed.
+
 ## Row PS4 controller / OpenXR
 
 - Windows Bluetooth diagnostic: 120 s, 23,756 CRC-valid extended reports;

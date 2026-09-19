@@ -1,5 +1,25 @@
 # Current handoff — 2026-09-19
 
+Waterline follow-up: user purchased Waterline PRO and created the local UE5.8
+WaterlinePro project. Imported its Content/Waterline into ignored ROW content;
+the purchase source remains untouched. Gen 4 GPU waves/materials now render on
+ROW's geographic mesh with ROW datum/masks/wakes. Vendor instance base-property
+overrides must be cleared: stock opaque/one-sided overrides hide the adapted
+surface and defeat masks. build_waterline.py handles this explicitly.
+Normal ROW launches automatically use the generated local adapter. -LegacyWater
+restores original water; absent content also retains original water. Vendor
+buoyancy/drag/shallow-water/underwater are disabled. No Fly/settings changes.
+See ROW_WATERLINE.ja.md and VALIDATION for reproduction and measured limits.
+Offline lake run completed calibration and travelled 57.233 m with nine strokes;
+frame-gap protection subsequently stopped it. Sea preview also encountered a
+calibration frame gap. A subsequent 50-second sea run without screenshot capture
+completed 80.627 m / 11 strokes / 31.918 active seconds with no tracking issue;
+capture stalls are implicated, not proven as the only cause. Do not claim
+continuous VR performance or change the tracking watchdog to hide render stalls.
+The user subsequently reported trying this build and explicitly requested push
+on 2026-09-19. No headset, duration or detailed stereo/performance results were
+specified; retain those detailed acceptance checks as pending.
+
 Row PS4 follow-up: user mounted a PS4-compatible controller in place of the
 WIT accelerometer, facing forward about 40 degrees up. Implemented PS4 gyro /
 accel input and OpenXR HMD for both Quest and VIVE. Square=start/pause/resume,

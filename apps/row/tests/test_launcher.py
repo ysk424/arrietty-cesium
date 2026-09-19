@@ -26,7 +26,7 @@ class RowLauncherTests(unittest.TestCase):
     def test_magnification_reaches_ue_after_explicit_y(self):
         place=dict(country_ja='Fixture',region_ja='Fixture',name_ja='Fixture')
         scene=dict(water_height_msl_m=0,water_height_ellipsoid_m=0,elevation_source='fixture')
-        for option in ([],['--mag','2.5'],['--magnification','10']):
+        for option in ([],['--mag','2.5'],['--magnification','10'],['--legacy-water']):
             with self.subTest(option=option), tempfile.TemporaryDirectory() as td:
                 root=Path(td);app=root/'apps/row';project=app/'unreal/ArriettyCesium'
                 for file in (root/'engine/Engine/Binaries/Win64/UnrealEditor.exe',
@@ -42,8 +42,9 @@ class RowLauncherTests(unittest.TestCase):
                      patch.object(launch.subprocess,'call',return_value=0) as start,patch.object(sys,'stdout',io.StringIO()):
                     self.assertEqual(launch.main(),0)
                     command=start.call_args.args[0]
-                    mag=float(option[-1]) if option else 1.
+                    mag=float(option[-1]) if option and option[0]!='--legacy-water' else 1.
                     self.assertEqual(float(next(arg.split('=',1)[1] for arg in command if arg.startswith('-RowMagnification='))),mag)
+                    self.assertEqual('-RowLegacyWater' in command,'--legacy-water' in option)
                     self.assertIn('-DisablePlugins=OpenXR',command)
                     self.assertNotIn('test-only',' '.join(command))
                     self.assertNotIn('OPENAI_API_KEY',start.call_args.kwargs['env'])
@@ -54,7 +55,7 @@ class RowLauncherTests(unittest.TestCase):
         workspace=Path(__file__).resolve().parents[3]
         for shell in ('powershell.exe','pwsh.exe'):
             if not shutil.which(shell): continue
-            for option in ([],['-mag','2.5'],['-Magnification','10']):
+            for option in ([],['-mag','2.5'],['-Magnification','10'],['-LegacyWater']):
                 with self.subTest(shell=shell,option=option),tempfile.TemporaryDirectory() as td:
                     root=Path(td);directory=root/'apps/row/tools';directory.mkdir(parents=True)
                     script=(workspace/'row.ps1').read_text(encoding='utf-8-sig')
@@ -67,5 +68,6 @@ class RowLauncherTests(unittest.TestCase):
                     self.assertEqual(result.returncode,0,result.stdout+result.stderr)
                     args=json.loads(next(line[5:] for line in result.stdout.splitlines() if line.startswith('ARGV=')))
                     self.assertEqual(args[0],'Lake Bled')
-                    self.assertEqual(args[args.index('--magnification')+1],option[-1] if option else '1')
+                    self.assertEqual(args[args.index('--magnification')+1],option[-1] if option and option[0]!='-LegacyWater' else '1')
+                    self.assertEqual('--legacy-water' in args,'-LegacyWater' in option)
                     self.assertIn('--demo',args)

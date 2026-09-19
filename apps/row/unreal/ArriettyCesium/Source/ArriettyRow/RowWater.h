@@ -15,8 +15,14 @@ public:
     ARowWater();
     void UpdateBoat(FVector Position,float Heading,float Speed,float Drive,float DeltaSeconds);
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 private:
     void Upload();
+    void StartWaterline();
+    void SyncWaterline();
+    UPROPERTY() TObjectPtr<AActor> Waterline;
+    UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> WaterlineMaterial;
+    bool WaterlineTickOrdered=false;
     UPROPERTY() TObjectPtr<UProceduralMeshComponent> Patch;
     UPROPERTY() TObjectPtr<UProceduralMeshComponent> FarSurface;
     UPROPERTY() TObjectPtr<UTexture2D> Field;

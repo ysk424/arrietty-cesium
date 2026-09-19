@@ -14,6 +14,7 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument('place')
     p.add_argument('--demo',action='store_true')
+    p.add_argument('--legacy-water',action='store_true',help='Use the original ROW water renderer')
     p.add_argument('--resolve-only',action='store_true',help='Identify only; no confirmation or terrain preparation')
     p.add_argument('--prepare-only',action='store_true',help='Confirm and prepare scene; do not launch UE')
     p.add_argument('--refresh-place',action='store_true')
@@ -84,6 +85,8 @@ def main():
              '-abslog='+str(log),'-nosplash','-windowed','-ResX=1600','-ResY=900',
              '-ExecCmds=t.MaxFPS 90,t.IdleWhenNotForeground 0']
     command+=['-RowDemo','-nohmd','-DisablePlugins=OpenXR'] if args.demo else ['-vr']
+    if args.legacy_water:
+        command+=['-RowLegacyWater']
     # Only the inherited environment carries a token override, never argv or scene JSON.
     env=os.environ.copy();env['CESIUM_ION_TOKEN']=token
     env.pop('OPENAI_API_KEY',None)
