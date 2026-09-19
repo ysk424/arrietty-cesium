@@ -1,5 +1,51 @@
 # Current handoff — 2026-09-19
 
+ROW recommendations: root reco.json contains 31 scenic sea/lake candidates with
+Japanese comments, primary-source URLs, radius_km and magnification=0.6*radius_km
+(10 km/h physical pace, 10 minutes straight to the radius). Root reco.ps1 lists
+or shows entries without network access, then passes only the selected entry to
+the unchanged row.ps1 place launcher. Preserve its lake-height checks and Y gate.
+No fixed coordinates/heights, no batch preparation, no Cesium downloads were
+performed for this task. Normal selected-place launch still uses network APIs
+and Cesium after confirmation. All 31 locations remain untested in the renderer.
+112 isolated stub-launcher checks passed on PowerShell 7.6.3 and 5.1.
+See ROW_RECO.ja.md. User requested publication on 2026-09-19 and plans to try
+the numbered recommendations daily. This is a future test plan, not acceptance.
+
+ROW shore follow-up: user requested Waterline shore waves with no additional
+boat/HMD rocking. RowShore captures only loaded, rendered Cesium terrain from
+above (512 m square, 512x512, once per second) and builds a 24 m influence band
+on the GPU. Purchased MF_Shore_Gen3 supplies rolling waves, normals and foam.
+No bathymetry, tide/current, movement, camera, control or Fly changes. A
+noncolliding 2 m mesh covers 28–240 m around the boat; vertical surf is capped
+at 15 cm and fades over 200–240 m. Lakes and missing adapter content disable
+surf. Regenerate local Waterline materials after pulling. Normal use has no
+GPU readback; -RowDemo -RowShoreCheck enables a one-shot capture diagnostic.
+See ROW_WATERLINE.ja.md and VALIDATION.md for evidence and remaining VR checks.
+User requested publication on 2026-09-19; live VR acceptance remains pending.
+
+Tapo follow-up: user has four P105 smart plugs for Lighthouse power and wants
+PowerShell control, defaulting to all four. Root tapo.ps1 supplies manual
+Setup/Configure/Discover/State/On/Off; Configure saves exactly four distinct IPs
+in ignored config/tapo.local.json. On/Off/State use that group unless -Address
+overrides it. No automatic Row/Fly power hooks. Credentials are supplied locally
+as PSCredential or KASA_USERNAME/KASA_PASSWORD environment variables, then passed
+to the external CLI via environment, never argv. The script itself does not save
+credentials. User explicitly requested environment storage; docs provide masked
+input and optional persistent user-environment commands (unencrypted storage).
+Environment-only operation and explicit credential precedence are fixture-tested.
+python-kasa 0.10.2 installed in ignored
+.runtime/tapo. User supplied four IPs, registered privately in config/tapo.local.json.
+User's live State attempt discovered P105(JP) advertising TPAP, rejected as
+unsupported by python-kasa 0.10.2 before credential validation. This does not
+establish a wrong password. TP-Link documents Third-Party Compatibility in the
+Tapo account's Third-Party Services. User subsequently reported it works; detailed
+per-plug results were not supplied. Agent performed no live plug power operations.
+Windows PowerShell and PowerShell 7 isolated
+fixtures passed default-group/override/WhatIf/discovery/failure-stop/credential
+restoration checks; pip check passed. See docs/TAPO.ja.md. Included in the
+2026-09-19 publication requested by the user.
+
 Waterline follow-up: user purchased Waterline PRO and created the local UE5.8
 WaterlinePro project. Imported its Content/Waterline into ignored ROW content;
 the purchase source remains untouched. Gen 4 GPU waves/materials now render on

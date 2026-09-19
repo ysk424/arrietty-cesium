@@ -17,6 +17,7 @@
 #include "UObject/UnrealType.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
+#include "RowShore.h"
 
 void ARowWater::StartWaterline() {
     if(FParse::Param(FCommandLine::Get(),TEXT("RowLegacyWater")) ||
@@ -76,16 +77,22 @@ void ARowWater::SyncWaterline() {
     auto p=FindFProperty<FObjectPropertyBase>(Waterline->GetClass(),TEXT("Water Surface DYN"));
     auto source=p?Cast<UMaterialInstanceDynamic>(p->GetObjectPropertyValue_InContainer(Waterline)):nullptr;
     if(!source) return;
-    if(!WaterlineMaterial) UE_LOG(LogTemp,Display,TEXT("ROW_WATERLINE_MATERIAL_BOUND material=%s"),*source->GetName());
+    if(!WaterlineMaterial) {
+        UE_LOG(LogTemp,Display,TEXT("ROW_WATERLINE_MATERIAL_BOUND material=%s"),*source->GetName());
+        if(auto geo=ARowGeography::Get(GetWorld()); geo && !geo->HasFailed()) geo->ConfigureWater(source);
+    }
     WaterlineMaterial=source;
     if(LocalMaterial && DistantMaterial) {
-        for(auto m:{LocalMaterial,DistantMaterial}) {
+        for(auto m:{LocalMaterial,DistantMaterial,ShoreMaterial}) {
+            if(!m) continue;
             m->CopyInterpParameters(source);
             m->SetTextureParameterValue(TEXT("WakeField"),Field);
         }
     }
 }
 void ARowWater::EndPlay(const EEndPlayReason::Type Reason) {
+    if(IsValid(ShoreManager)) ShoreManager->Destroy();
+    ShoreManager=nullptr;
     if(IsValid(Waterline)) Waterline->Destroy();
     Waterline=nullptr; WaterlineMaterial=nullptr;
     Super::EndPlay(Reason);
@@ -99,10 +106,22 @@ ARowWater::ARowWater() {
     FarSurface->SetupAttachment(RootComponent); FarSurface->SetAbsolute(true,true,true);
     FarSurface->SetCollisionEnabled(ECollisionEnabled::NoCollision); FarSurface->SetCastShadow(false);
     FarSurface->SetBoundsScale(2.f);
+    ShoreSurface=CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("ShoreWaveSurface"));
+    ShoreSurface->SetupAttachment(RootComponent);
+    ShoreSurface->SetCollisionEnabled(ECollisionEnabled::NoCollision); ShoreSurface->SetCastShadow(false);
+    ShoreSurface->SetBoundsScale(1.1f);
 }
 void ARowWater::BeginPlay() {
     Super::BeginPlay();
     StartWaterline();
+    if(auto geo=ARowGeography::Get(GetWorld()); Waterline && geo && geo->IsOcean() && !geo->HasFailed()) {
+        ShoreManager=GetWorld()->SpawnActor<ARowShore>();
+        if(!ShoreManager || !ShoreManager->Initialize(geo,WaterlineMaterial)) {
+            if(ShoreManager) ShoreManager->Destroy();
+            ShoreManager=nullptr;
+            UE_LOG(LogTemp,Warning,TEXT("ROW_SHORE_CONTENT_MISSING surf_disabled reimport_waterline"));
+        }
+    }
     auto base=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Row/Materials/M_RowWater.M_RowWater"));
     if(Waterline) base=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Row/Waterline/MI_RowWaterline.MI_RowWaterline"));
     if(!base) { UE_LOG(LogTemp,Error,TEXT("ROW_WATER_MATERIAL_MISSING")); return; }
@@ -123,8 +142,26 @@ void ARowWater::BeginPlay() {
         for(int y=0;y<FarN-1;++y) for(int x=0;x<FarN-1;++x) { int k=y*FarN+x; ft.Append({k,k+1,k+FarN,k+1,k+FarN+1,k+FarN}); }
         FarSurface->CreateMeshSection_LinearColor(0,fv,ft,fn,fuv,{}, {},false);
         FarSurface->SetMaterial(0,DistantMaterial);
+        if(ShoreManager) {
+            // Two-metre mesh near the viewer resolves gentle surf even when
+            // the original 250 m distant-ocean cells cannot. No physics mesh.
+            constexpr int SN=257; constexpr double SS=200.;
+            TArray<FVector> sv,sn; TArray<FVector2D> suv; TArray<int32> st;
+            for(int y=0;y<SN;++y) for(int x=0;x<SN;++x) {
+                sv.Add(FVector((x-128)*SS,(y-128)*SS,0)); sn.Add(FVector::UpVector);
+                suv.Add(FVector2D(double(x)/(SN-1),double(y)/(SN-1)));
+            }
+            for(int y=0;y<SN-1;++y) for(int x=0;x<SN-1;++x) {
+                int k=y*SN+x; st.Append({k,k+1,k+SN,k+1,k+SN+1,k+SN});
+            }
+            ShoreMaterial=UMaterialInstanceDynamic::Create(base,this);
+            geo->ConfigureWater(ShoreMaterial); ShoreMaterial->SetScalarParameterValue(TEXT("LocalPatch"),2);
+            ShoreSurface->CreateMeshSection_LinearColor(0,sv,st,sn,suv,{}, {},false);
+            ShoreSurface->SetMaterial(0,ShoreMaterial);
+            UE_LOG(LogTemp,Display,TEXT("ROW_WATERLINE_SHORE_READY vendor_rolling_waves=1 radius_m=240 cell_m=2 max_height_cm=15"));
+        }
     }
-    for(auto m:{LocalMaterial,DistantMaterial}) m->SetTextureParameterValue(TEXT("WakeField"),Field);
+    for(auto m:{LocalMaterial,DistantMaterial,ShoreMaterial}) if(m) m->SetTextureParameterValue(TEXT("WakeField"),Field);
     int waterActors=0;
     for(TActorIterator<AStaticMeshActor> it(GetWorld());it;++it) {
         auto mesh=it->GetStaticMeshComponent();
@@ -145,11 +182,13 @@ void ARowWater::BeginPlay() {
 }
 void ARowWater::UpdateBoat(FVector pos,float heading,float speed,float drive,float dt) {
     if(!LocalMaterial) return;
+    if(ShoreManager) ShoreManager->Update(pos,dt);
     SyncWaterline();
     const double x=pos.X*.01,y=pos.Y*.01;
     static_assert(row::Waves::N==row::KelvinWake::N && row::Waves::Cell==row::KelvinWake::Cell);
     Waves.center(x,y); Kelvin.center(x,y); SetActorLocation(FVector(pos.X,pos.Y,0));
-    for(auto m:{LocalMaterial,DistantMaterial}) {
+    for(auto m:{LocalMaterial,DistantMaterial,ShoreMaterial}) {
+        if(!m) continue;
         m->SetVectorParameterValue(TEXT("Boat"),FLinearColor(pos.X,pos.Y,0,0));
         m->SetVectorParameterValue(TEXT("BoatDirection"),FLinearColor(std::cos(heading),std::sin(heading),0,0));
     }

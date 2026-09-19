@@ -28,6 +28,8 @@ public:
     bool CanNavigate(FVector Position) const;
     bool CanNavigatePath(FVector From,FVector To) const;
     void ConfigureWater(UMaterialInstanceDynamic* Material) const;
+    bool IsOcean() const { return Ocean; }
+    AActor* GetTerrainActor() const;
     double GetRenderRadiusCm() const { return Ocean?3000000.:FMath::Max(FMath::Max(FMath::Abs(Bounds.X),FMath::Abs(Bounds.Y)),FMath::Max(FMath::Abs(Bounds.X+Bounds.Z),FMath::Abs(Bounds.Y+Bounds.W)))+5000.; }
     FString PlaceLabel;
 private:

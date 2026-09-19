@@ -8,6 +8,7 @@
 class UProceduralMeshComponent;
 class UMaterialInstanceDynamic;
 class UTexture2D;
+class ARowShore;
 UCLASS()
 class ARRIETTYROW_API ARowWater:public AActor {
     GENERATED_BODY()
@@ -21,13 +22,16 @@ private:
     void StartWaterline();
     void SyncWaterline();
     UPROPERTY() TObjectPtr<AActor> Waterline;
+    UPROPERTY() TObjectPtr<ARowShore> ShoreManager;
     UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> WaterlineMaterial;
     bool WaterlineTickOrdered=false;
     UPROPERTY() TObjectPtr<UProceduralMeshComponent> Patch;
     UPROPERTY() TObjectPtr<UProceduralMeshComponent> FarSurface;
+    UPROPERTY() TObjectPtr<UProceduralMeshComponent> ShoreSurface;
     UPROPERTY() TObjectPtr<UTexture2D> Field;
     UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> LocalMaterial;
     UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> DistantMaterial;
+    UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> ShoreMaterial;
     row::Waves Waves;
     row::KelvinWake Kelvin;
     std::vector<float> Surface=std::vector<float>(row::Waves::N*row::Waves::N);

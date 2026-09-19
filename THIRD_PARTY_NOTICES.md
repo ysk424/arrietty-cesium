@@ -28,6 +28,9 @@
   also excluded from Git. No audio redistribution permission is inferred from
   the application's MIT license. See docs/FLY_AUDIO.ja.md.
 - Optional inherited device diagnostics use Bleak (MIT) and pyopenvr (MIT).
+- Optional Tapo power CLI: python-kasa 0.10.2, GPL-3.0-or-later, community project.
+  Invoked as a separate executable; installed locally under .runtime/tapo and
+  not distributed in this repository. https://github.com/python-kasa/python-kasa
 
 No old Lake Bled scenery, Epic engine code/binaries, downloaded Cesium plugin,
 device identifiers, API credentials or exercise records are committed. The

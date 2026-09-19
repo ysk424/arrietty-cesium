@@ -32,6 +32,16 @@ acceptance is still pending. Root `-LegacyWater` / Python `--legacy-water` /
 UE `-RowLegacyWater` select original water. Test fixtures use original water so
 control regression tests never require proprietary content. See ROW_WATERLINE.ja.md.
 
+ROW sea water optionally uses RowShore's 512x512 orthographic depth capture of
+only the rendered Cesium terrain, over a 512 m square, once per second. GPU seed /
+bounded jump-flood passes provide MF_Shore_Gen3 with a 24 m influence band and
+signed shoreward direction. No OSM acquisition edge, boat or vendor water mesh
+is captured. This is neither bathymetry nor a datum source; the existing curved
+mean is used only to distinguish exposed land. Lakes omit the capture. A
+noncolliding 2 m mesh resolves nearby surf; vertical surf is capped at 15 cm and
+fades over 200–240 m. HMD/boat motion and navigation are unchanged. Normal use
+has no GPU readback. Demo-only -RowShoreCheck provides diagnostic readback.
+
 Row supports `-Magnification` / `-mag` (1..10, default 1, decimals allowed),
 forwarded as `--magnification` (`--mag` also accepted by Python) and
 `-RowMagnification` to UE. The rowing model scales only the final horizontal

@@ -19,6 +19,7 @@
 #include "Serialization/JsonSerializer.h"
 
 ARowGeography::ARowGeography() { PrimaryActorTick.bCanEverTick=true; }
+AActor* ARowGeography::GetTerrainActor() const { return Terrain; }
 ARowGeography* ARowGeography::Get(UWorld* World) {
     if(World) for(TActorIterator<ARowGeography> it(World);it;++it) return *it;
     return nullptr;

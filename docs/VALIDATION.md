@@ -1,5 +1,57 @@
 # Row / Fly integration validation — 2026-09-19
 
+## ROW recommendations (no terrain downloads)
+
+- Created 31 entries with primary-source scenic references, explicit radius and
+  magnification=0.6*radius. Sources were checked through public web pages; no
+  Cesium tiles/images, scene preparation or live place resolution were requested
+  for this catalog. Selected-place launches still use the normal ROW resolver.
+- `tools/test_reco.ps1`: **112 checks passed on both PowerShell 7.6.3 and Windows
+  PowerShell 5.1**. A temporary stub replaces row.ps1; all 31 selections, the
+  ten-minute calculation, switches/values, list/show without launch, cancellation,
+  invalid IDs/catalogs and downstream errors were exercised without network.
+- Inspected actual `./reco.ps1 14 -Show` output: Japanese comment, radius 4 km,
+  multiplier 2.4, launch query and source printed correctly without launching.
+- No acceptance claim for the 31 locations' lake heights, navigability, Cesium
+  coverage or rendered appearance. Small lakes can reach shore before the radius.
+
+## ROW Waterline shoreline follow-up
+
+- UE 5.8.2 Editor Development build and repeat local material generation passed.
+  Purchased source content was not changed. The generated adapter references
+  MF_Shore_Gen3 and explicitly binds its noise/wave/normal/foam textures.
+- `apps/row/tools/test_setup.ps1 -Waterline`: **4 UE tests passed** (SetupEnter,
+  Ps4, Magnification, ShoreField), with hardware/OpenXR disabled and an offline
+  fixture that never creates a Cesium scene. Evidence:
+  logs/row/setup-controls-20260919-193948.log.
+- GPU tests exercise actual depth-to-seed, bounded jump flood and shore field
+  materials: empty sea has no surf, the 10 m strip has expected influence,
+  opposite shores retain signed directions, and land/far water have no surf.
+  The purchased function produces foam and bounded vertical waves. Foam peaks
+  were 0.4111/0.2996 at t=0/2 s, with total pixel change 443.7185; vertical wave
+  peaks were 1.0068/0.5620 cm. These are fixture values, not measurements of a ride.
+- Initial synchronous GPU tests sampled black textures before editor async asset
+  compilation finished. The test now waits for that compilation; production
+  does not add this blocking wait. Final test uses normal texture streaming.
+- Earlier in this follow-up, before the user's no-download request, a non-VR
+  sea capture confirmed 13,241 active coastal pixels (of 262,144), max influence
+  0.9580, actual terrain depth and 934 captured components. Evidence:
+  logs/row/waterline-shore-capture.log. The synthetic ride reached 80.63 m and
+  11 strokes, then paused at the normal shore boundary without a frame gap.
+- The default ortho far plane initially clipped the terrain. RowShore now uses
+  an explicit 0–20 km depth range around the 10 km capture altitude. An abandoned
+  OSM-based strip did not align with the visible shore; it is not shipped.
+- **472 native checks and 14 Python tests passed**. Waterline shoreline changes
+  do not modify movement, HMD/boat motion, controls, mean water height or lakes.
+- A screenshot preview encountered calibration frame_gap (dt=0.1895 s); no
+  watchdog was relaxed. Final composite appearance was not rechecked against a
+  live Cesium scene after the no-download instruction. Final vendor animation is
+  GPU-fixture verified; Quest/VIVE stereo, visual surf strength, long-distance
+  seams and sustained frame time remain live acceptance checks. Existing Cesium
+  metadata enum initialization warnings persist in test startup logs.
+- No live ride was stopped; builds/imports ran with UE closed. Debug exports,
+  sessions, generated materials and purchased Waterline assets remain ignored.
+
 ## ROW Waterline Gen 4 local integration
 
 - User reported trying the build and requested publication on 2026-09-19.
