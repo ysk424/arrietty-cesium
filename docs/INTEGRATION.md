@@ -118,6 +118,28 @@ wave shader. Row's independent high-lake water system is retained.
 
 ## Controls and time
 
+Row's optional `bar_input=ps4` selects an explicit private `ps4_hid_path`.
+Windows HID reads CRC-validated Bluetooth 0x11 reports, with a neutral
+HidD_SetOutputReport request enabling sensors (no effects). A worker integrates
+gyro and complementary gravity correction for the arbitrary mounted angle;
+PS4-only bias washout/velocity decay feeds the existing IMU rowing model.
+Square is Enter, triangle is keypad 0; repeats are suppressed and stop wins.
+L1/R1 select +/-0.5 steer, L2/R2 +/-1; same-side strong wins, opposing sides
+cancel, release removes yaw immediately. HMD lean/gaze do not steer PS4 mode.
+Quest and VIVE use these same controls. PS4/WIT HMD poses use UE/OpenXR raw
+tracking space; only legacy Tracker mode starts the OpenVR pose worker.
+The earlier HMD-lean and manual-restart contract remains for WIT/Tracker mode.
+
+The user explicitly requested automatic PS4 reconnect recovery. PS4 staleness
+>=0.25 s pauses motion/audio. A previously running ride resumes when fresh
+controller/IMU and HMD tracking return, retaining position, time, distance and
+calibration and resetting estimated velocity. Square pause and triangle Home
+cancel automatic recovery; geography remains the outer gate. HMD-only loss,
+frame faults, terrain pauses and interrupted calibration do not auto-resume.
+Do not integrate a disconnected interval or replay queued start events.
+Sensor yaw during a gap is not observable; retaining the frame and releveling
+gravity is an estimate requiring mounted live evaluation. See ROW_PS4.ja.md.
+
 Row optionally selects `bar_input=wt9011dcl` in its private settings. A separate
 native GATT worker reads WIT FFE5/FFE4 (vendor UUID suffix 5f9a34fb), with the
 advertised or previously verified address type. It subscribes only; no control

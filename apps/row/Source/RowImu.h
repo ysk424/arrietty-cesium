@@ -21,6 +21,7 @@ struct ImuSample {
     double received=-1e9;
     uint64_t sequence=0;
     bool valid=false;
+    bool compensated=false; // PS4 worker already rotated acceleration into its gravity-aligned frame.
     bool fresh(double now) const {
         return valid && finite(acceleration) && finite(angularVelocity) && finite(angles)
             && std::isfinite(now) && now>=received && now-received<.25;
@@ -42,6 +43,7 @@ inline bool parseImu(const uint8_t* data,size_t size,double now,ImuSample& out) 
 // Rotate the sensor axes to its AHRS frame (Rz(yaw)*Ry(pitch)*Rx(roll)).
 // This frame has no relationship to SteamVR room north; never use it for HMD steering.
 inline ImuVector imuEarthAcceleration(const ImuSample& sample) {
+    if(sample.compensated) return sample.acceleration;
     constexpr double radians=3.14159265358979323846/180.;
     const double r=sample.angles.x*radians,p=sample.angles.y*radians,y=sample.angles.z*radians;
     const double cr=std::cos(r),sr=std::sin(r),cp=std::cos(p),sp=std::sin(p),cy=std::cos(y),sy=std::sin(y);
@@ -59,7 +61,7 @@ struct ImuFit {
 // A short, damped velocity estimate for stroke phase, never an absolute pose.
 // Integrate each received sample once, independent of rendering frequency.
 struct ImuMotion {
-    double velocity=0,quiet=0;
+    double velocity=0,quiet=0,accelerationBias=0;
     ImuFit fit;
     ImuSample previous;
     void start(const ImuFit& calibration,const ImuSample& sample) {
@@ -77,12 +79,19 @@ struct ImuMotion {
         // Also reject residual constant bias: a quiet sensor cannot supply
         // indefinite drive, even while stale positive FTMS watts remain fresh.
         const bool still=magnitude(sample.angularVelocity)<4 &&
-            (magnitude(acceleration)<.2 || magnitude(change)<.07);
+            (magnitude(acceleration)<.2 || (sample.compensated?magnitude(change)/dt<.7:magnitude(change)<.07));
         quiet=still?quiet+dt:0;
-        // Keep a normal stroke's velocity long enough to distinguish its braking
-        // acceleration from an actual reversal. Quiet/gap gates remove drift.
-        velocity=std::clamp(velocity*std::exp(-dt/4.)+dot(acceleration,fit.axis)*dt,-2.5,2.5);
-        if(quiet>=.35) velocity=0;
+        // Keep the accepted WIT integration unchanged. PS4's gravity-compensated
+        // estimate uses a 1.5 s bias washout and 0.6 s velocity decay to bound
+        // residual tilt/scale drift; its higher sampling rate permits a 0.1 s
+        // quiet reset. These filters estimate phase, not absolute bar travel.
+        double along=dot(acceleration,fit.axis);
+        if(sample.compensated) {
+            accelerationBias+=(along-accelerationBias)*(1-std::exp(-dt/1.5));
+            along-=accelerationBias;
+        }
+        velocity=std::clamp(velocity*std::exp(-dt/(sample.compensated?.6:4.))+along*dt,-2.5,2.5);
+        if(quiet>=(sample.compensated?.10:.35)) velocity=0;
         return true;
     }
 };

@@ -14,6 +14,7 @@ public class ArriettyRow : ModuleRules {
         PublicSystemIncludePaths.Add(Path.Combine(sdk,"headers"));
         PublicAdditionalLibraries.Add(Path.Combine(sdk,"lib/win64/openvr_api.lib"));
         PublicSystemLibraries.Add("windowsapp.lib");
+        PublicSystemLibraries.Add("hid.lib");
         PublicSystemIncludePaths.Add(Path.Combine(Target.WindowsPlatform.WindowsSdkDir!,"Include",Target.WindowsPlatform.WindowsSdkVersion!,"cppwinrt"));
         PublicDelayLoadDLLs.Add("openvr_api.dll");
         RuntimeDependencies.Add("$(TargetOutputDir)/openvr_api.dll",Path.Combine(sdk,"bin/win64/openvr_api.dll"));

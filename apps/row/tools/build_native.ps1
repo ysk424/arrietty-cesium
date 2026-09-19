@@ -16,16 +16,18 @@ $audioLine='cl /nologo /std:c++20 /EHsc /W4 /WX /O2 /I "'+(Join-Path $repo 'Sour
 $trackingLine='cl /nologo /std:c++20 /EHsc /W4 /WX /O2 /I "'+(Join-Path $repo 'Source')+'" "'+(Join-Path $repo 'tests/tracking_tests.cpp')+'" /Fe:tracking_tests.exe'
 $imuLine='cl /nologo /std:c++20 /EHsc /W4 /WX /O2 /I "'+(Join-Path $repo 'Source')+'" "'+(Join-Path $repo 'tests/imu_tests.cpp')+'" /Fe:imu_tests.exe'
 $terrainLine='cl /nologo /std:c++20 /EHsc /W4 /WX /O2 /I "'+(Join-Path $repo 'Source')+'" "'+(Join-Path $repo 'tests/terrain_tests.cpp')+'" /Fe:terrain_tests.exe'
+$ps4Line='cl /nologo /std:c++20 /EHsc /W4 /WX /O2 /I "'+(Join-Path $repo 'Source')+'" "'+(Join-Path $repo 'tests/ps4_tests.cpp')+'" /Fe:ps4_tests.exe'
 if($ImuTestsOnly) { $line=$imuLine }
 if($Devices) {
     & (Join-Path $PSScriptRoot 'bootstrap.ps1')
     $sdk=Join-Path $workspace 'ThirdParty/OpenVR'
-    $line='cl /nologo /std:c++20 /EHsc /W3 /O2 /I "'+(Join-Path $repo 'Source')+'" /I "'+(Join-Path $sdk 'headers')+'" "'+(Join-Path $repo 'Source/RowDevices.cpp')+'" "'+(Join-Path $repo 'tools/device_probe.cpp')+'" /Fe:device_probe.exe /link windowsapp.lib "'+(Join-Path $sdk 'lib/win64/openvr_api.lib')+'"'
+    $line='cl /nologo /std:c++20 /EHsc /W3 /O2 /I "'+(Join-Path $repo 'Source')+'" /I "'+(Join-Path $sdk 'headers')+'" "'+(Join-Path $repo 'Source/RowDevices.cpp')+'" "'+(Join-Path $repo 'tools/device_probe.cpp')+'" /Fe:device_probe.exe /link windowsapp.lib hid.lib "'+(Join-Path $sdk 'lib/win64/openvr_api.lib')+'"'
     Copy-Item -LiteralPath (Join-Path $sdk 'bin/win64/openvr_api.dll') -Destination $out -Force
 }
 $bat=Join-Path $out 'build.cmd'
 $commands=@('@echo off',('call "'+$setup+'" >nul'),$line,'if errorlevel 1 exit /b %errorlevel%')
 if(-not $Devices -and -not $ImuTestsOnly) { $commands+=@($waterLine,'if errorlevel 1 exit /b %errorlevel%',$audioLine,'if errorlevel 1 exit /b %errorlevel%',$trackingLine,'if errorlevel 1 exit /b %errorlevel%',$imuLine,'if errorlevel 1 exit /b %errorlevel%',$terrainLine) }
+if(-not $Devices -and -not $ImuTestsOnly) { $commands+=@('if errorlevel 1 exit /b %errorlevel%',$ps4Line) }
 $commands+='exit /b %errorlevel%'
 $commands | Set-Content -LiteralPath $bat -Encoding ascii
 Push-Location $out
@@ -39,6 +41,7 @@ try {
         & './tracking_tests.exe'; if($LASTEXITCODE -ne 0) { throw 'Tracking tests failed' }
         & './imu_tests.exe'; if($LASTEXITCODE -ne 0) { throw 'IMU tests failed' }
         & './terrain_tests.exe'; if($LASTEXITCODE -ne 0) { throw 'Terrain tests failed' }
+        & './ps4_tests.exe'; if($LASTEXITCODE -ne 0) { throw 'PS4 tests failed' }
     }
 }
 finally { Pop-Location }

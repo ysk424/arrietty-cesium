@@ -26,6 +26,8 @@ private:
     friend class FRowKeyInput;
     friend class FRowSetupControlsTest;
     friend class FRowMovementTest;
+    friend class FRowPs4ControlsTest;
+    void HandlePs4Controls(double Now,bool Ready);
     void Toggle();
     void ShowSetupPanel();
     void FinishCalibration(const row::Input& Input);
@@ -54,6 +56,8 @@ private:
     FString SessionFile,Notice;
     bool Offline=false,Demo=false,DemoStarted=false;
     bool UseImu=false;
+    bool UsePs4=false;
+    uint64 Ps4Starts=0,Ps4Stops=0;
     bool Chase=false;
     double Began=0,NextRecord=0,SimTime=0,QuitAfter=0;
     double CalibrationMotionTime=0;

@@ -1,5 +1,45 @@
 # Row / Fly integration validation — 2026-09-19
 
+## Row PS4 controller / OpenXR
+
+- Windows Bluetooth diagnostic: 120 s, 23,756 CRC-valid extended reports;
+  accelerometer and gyro all three axes changed. Mounted capture: 37.7106 s,
+  7,517 valid reports, no CRC failures, maximum observed reception gap 32.553 ms.
+  Square/triangle and individual L1/R1/L2/R2 press/release were verified. Raw
+  samples and device selection remain private under logs/row/ps4-sensor-test.
+- C++ decoder, complementary attitude filter, bias washout and velocity estimate
+  feed the existing rowing model. PS4 buttons control steering for either HMD;
+  IMU modes get HMD poses from UE/OpenXR. Existing WIT/Tracker rowing, water,
+  output/load gain and audio regression tests passed (363 existing checks).
+  **109 PS4 checks passed**, including CRC/truncation, held buttons, stop priority,
+  no HMD steering, release, dropout, automatic resume retaining ride state,
+  manual pause/stop persistence and synthetic mounted sensor calibration.
+- Synthetic ten-cycle input completes two calibration cycles then counts the
+  remaining eight, with zero drive at final rest. The private mounted recording
+  completes online calibration, then counts nine (eleven over the full trace),
+  although the requested exercise was ten cycles. Final movement/count agreement
+  remains unverified; this development recording is not an independent accuracy
+  test. Do not report exact live stroke accuracy or VR acceptance.
+- UE 5.8.2 rebuild succeeded. Offline Controls.SetupEnter, Controls.Ps4 and
+  Movement.Magnification passed. The PS4 UE fixture checks actual pawn command
+  routing, held/repeated square, triangle abort, readiness/stale press rejection
+  and stop priority. Tests disable OpenXR and do not open devices. **14 Row Python
+  tests passed**, including explicit-Y/EOF boundaries and launch parameters.
+- During final installation the controller was no longer enumerated. After the
+  user exited Row, local mode was switched to PS4 using the unique retained
+  Bluetooth HID interface for the previously tested device; USB was excluded.
+  Native live-worker reception remains pending reconnection.
+  Earlier sensor captures used Python HID; do not label them C++ worker tests.
+  Source/binary implementation is separate from this final device check.
+- No live ride was running before builds; the agent ran no normal place launcher.
+  The user later launched Row with the prior WIT setting; HMD tracking was valid,
+  but bar tracking was invalid and startup was blocked. This led to the local
+  setting change above, not a successful PS4 live-ride test.
+  User confirmed Quest 3 worked in Fly; Row/PS4 live VR remains unverified.
+  The user declared today's changes finished and requested documentation and
+  push. No additional live acceptance measurements were supplied. Fly application
+  and sibling repositories were not changed.
+
 ## Fly automatic initial preparation (no P)
 
 - Initial preparation now starts from the real UE pawn tick with no keyboard or

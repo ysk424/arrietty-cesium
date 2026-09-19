@@ -1,5 +1,6 @@
 {
   "bar_input": "tracker",
+  "ps4_hid_path": "",
   "imu_address": "",
   "imu_address_type": "",
   "tracker_serial": "",

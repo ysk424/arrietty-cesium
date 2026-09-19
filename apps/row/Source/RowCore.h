@@ -7,6 +7,7 @@
 #include <optional>
 #include "RowTracking.h"
 #include "RowImu.h"
+#include "RowPs4.h"
 
 namespace row {
 constexpr double Pi = 3.14159265358979323846;
@@ -84,7 +85,7 @@ inline double dot(Vec3 a,Vec3 b) { return a.x*b.x+a.y*b.y+a.z*b.z; }
 inline bool finite(Vec3 a) { return std::isfinite(a.x)&&std::isfinite(a.y)&&std::isfinite(a.z); }
 struct Pose { Vec3 position,forward{1,0,0}; bool valid=false; double received=-1e9; };
 enum class State { Ready, Running, Paused, TrackingLost, Calibrating };
-struct Input { Pose bar,head; Telemetry telemetry; double now=0; bool useImu=false; ImuSample imu; };
+struct Input { Pose bar,head; Telemetry telemetry; double now=0; bool useImu=false; ImuSample imu; bool usePs4=false; Ps4Controls controls; };
 struct SteeringFrame { Vec3 forward{1,0,0},center; bool valid=false; bool useImu=false; ImuFit imu; };
 struct Model {
     static constexpr double StraightMargin=.08,FullLean=.20,FullTurnRadius=10.;
@@ -99,6 +100,8 @@ struct Model {
     BarTracking barTracking;
     bool imuMode=false;
     ImuMotion imuMotion;
+    bool ps4Mode=false,reconnectPending=false;
+    SteeringFrame resumeFrame;
     static bool headTracking(const Input& in) {
         return in.head.valid && finite(in.head.position) && finite(in.head.forward)
             && in.now-in.head.received<.25 && in.now>=in.head.received;
@@ -109,7 +112,7 @@ struct Model {
             && in.now-in.bar.received<.25 && in.now>=in.bar.received;
     }
     static bool tracking(const Input& in) {
-        return barTracked(in) && headTracking(in);
+        return barTracked(in) && headTracking(in) && (!in.usePs4 || in.controls.fresh(in.now));
     }
     bool start(const Input& in,const SteeringFrame& frame) {
         if(!tracking(in) || !frame.valid || !finite(frame.forward) || !finite(frame.center) ||
@@ -121,6 +124,7 @@ struct Model {
         forward={f.x/len,f.y/len,0}; right={-forward.y,forward.x,0};
         neutralHead=frame.center;
         imuMode=in.useImu;
+        ps4Mode=in.usePs4; resumeFrame=frame; reconnectPending=false;
         previousBar=imuMode?0:dot(in.bar.position,forward);
         barPosition=previousBar; extreme=previousBar;
         barTracking.start(previousBar,dot(in.head.position,forward),in.now);
@@ -128,13 +132,22 @@ struct Model {
         barVelocity=lean=steer=drive=power=yawRate=0; initialized=true;
         pullTravel=recoveryTravel=0; pulling=false; armed=true; state=State::Running; return true;
     }
-    void pause() { if(state==State::Running) state=State::Paused; speed=drive=power=yawRate=0; }
+    void pause() { reconnectPending=false; if(state==State::Running || state==State::TrackingLost) state=State::Paused; speed=drive=power=yawRate=0; }
     void calibrate() { pause(); state=State::Calibrating; lean=steer=0; }
     void reset() { *this=Model{}; }
     // <=20ms substeps in caller; long frame gaps stop rather than launch the boat.
     double tick(const Input& in,double dt,double magnification=1) {
+        if(state==State::TrackingLost && reconnectPending && in.usePs4 && tracking(in)) {
+            // User requested seamless reconnect. Preserve location/time/distance,
+            // use the existing calibration, reset velocity so gaps add no impulse.
+            if(start(in,resumeFrame)) return 0;
+        }
         if(state!=State::Running) return 0;
-        if(!headTracking(in) || !std::isfinite(dt) || dt<=0 || dt>.1 || in.useImu!=imuMode || !validMagnification(magnification)) {
+        if(ps4Mode && (!in.controls.fresh(in.now) || !barTracked(in))) {
+            reconnectPending=true; state=State::TrackingLost; speed=drive=power=yawRate=steer=0;
+            barTracking.issue=TrackingIssue::BarTimeout; return 0;
+        }
+        if(!headTracking(in) || !std::isfinite(dt) || dt<=0 || dt>.1 || in.useImu!=imuMode || in.usePs4!=ps4Mode || !validMagnification(magnification)) {
             barTracking.issue=!headTracking(in)?TrackingIssue::HeadLost:TrackingIssue::FrameGap;
             state=State::TrackingLost; speed=drive=power=yawRate=0; return 0;
         }
@@ -164,8 +177,9 @@ struct Model {
         barVelocity+=(raw-barVelocity)*(1-std::exp(-dt/.06));
         const double lateral=dot(in.head.position-neutralHead,right);
         lean+=(std::clamp(lateral,-.35,.35)-lean)*(1-std::exp(-dt/.28));
-        const double amount=std::clamp((std::abs(lean)-StraightMargin)/(FullLean-StraightMargin),0.,1.);
-        steer=std::copysign(amount*amount,lean); // Gentle onset just outside the straight zone.
+        const double amount=ps4Mode?std::abs(in.controls.steer):std::clamp((std::abs(lean)-StraightMargin)/(FullLean-StraightMargin),0.,1.);
+        steer=ps4Mode?std::clamp(in.controls.steer,-1.,1.):std::copysign(amount*amount,lean);
+        if(ps4Mode) lean=0;
         // Keep a roughly 10 m full-steer radius as game watts raise speed.
         // Preserve the old low-speed authority and fade to zero at a standstill.
         const double fullYaw=std::clamp(speed/FullTurnRadius,.20,.55)*std::clamp(speed/1.2,0.,1.);

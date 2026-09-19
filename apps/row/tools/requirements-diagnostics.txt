@@ -1,2 +1,3 @@
 # Optional local hardware capture tools; the game uses native C++ only.
 bleak==3.0.2
+hidapi==0.15.0

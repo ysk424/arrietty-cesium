@@ -126,18 +126,24 @@ void ARowPawn::BeginPlay() {
             auto readAddress=[&](const TCHAR* key) { FString a; cfg->TryGetStringField(key,a); a.ReplaceInline(TEXT(":"),TEXT("")); a.ReplaceInline(TEXT("-"),TEXT("")); return FCString::Strtoui64(*a,nullptr,16); };
             dc.rowerAddress=readAddress(TEXT("rower_address")); dc.heartAddress=readAddress(TEXT("heart_rate_address"));
             FString barInput; cfg->TryGetStringField(TEXT("bar_input"),barInput);
-            UseImu=barInput==TEXT("wt9011dcl");
-            if(UseImu) {
+            UsePs4=barInput==TEXT("ps4");
+            UseImu=UsePs4 || barInput==TEXT("wt9011dcl");
+            dc.enableVr=!UseImu;
+            if(UsePs4) {
+                FString path;cfg->TryGetStringField(TEXT("ps4_hid_path"),path);dc.ps4Path=TCHAR_TO_UTF8(*path);
+                dc.trackerSerial.clear();
+                if(path.IsEmpty()) Notice=TEXT("PS4 not selected / run ps4_probe.py --select");
+            } else if(UseImu) {
                 dc.imuAddress=readAddress(TEXT("imu_address")); dc.trackerSerial.clear();
                 FString type; cfg->TryGetStringField(TEXT("imu_address_type"),type);
                 dc.imuAddressType=type==TEXT("random")?1:type==TEXT("public")?0:-1;
             }
             else if(!barInput.IsEmpty() && barInput!=TEXT("tracker")) {
                 // An unknown selection must not silently choose another sensor.
-                dc.trackerSerial.clear(); Notice=TEXT("Unknown bar_input in local settings");
+                dc.trackerSerial.clear(); dc.enableVr=false; Notice=TEXT("Unknown bar_input in local settings");
             }
         } else Notice=TEXT("Local device settings missing");
-        if(RowDeviceApiAvailable()) Devices=std::make_unique<row::Devices>(dc);
+        if(!dc.enableVr || RowDeviceApiAvailable()) Devices=std::make_unique<row::Devices>(dc);
         else Notice=TEXT("OpenVR SDK missing / run bootstrap");
     }
     Instruments->InitWidget(); Panel=Cast<URowPanel>(Instruments->GetWidget());
@@ -163,6 +169,7 @@ void ARowPawn::SetupPlayerInputComponent(UInputComponent* input) {
 row::Input ARowPawn::ReadInput() const {
     row::Input in; in.now=row::Devices::seconds(); in.bar=Snapshot.bar; in.head=Snapshot.head; in.telemetry=Snapshot.telemetry;
     in.useImu=UseImu && !Offline; in.imu=Snapshot.imu;
+    in.usePs4=UsePs4 && !Offline; in.controls=Snapshot.ps4;
     if(Offline) {
         const bool calibrating=Model.state==row::State::Calibrating;
         const double phase=std::fmod(calibrating?CalibrationMotionTime:SimTime,2.8);
@@ -182,15 +189,26 @@ row::Input ARowPawn::ReadInput() const {
             in.telemetry.resistance.set(6,in.now);
         }
     } else {
-        // OpenVR head provides a common physical room frame for lean/bar input;
-        // also require the actual OpenXR rendering pose to be tracked.
         auto xr=GEngine?GEngine->XRSystem:nullptr;
-        in.head.valid=in.head.valid && xr.IsValid() && xr->IsTracking(IXRTrackingSystem::HMDDeviceId);
+        if(UseImu) {
+            // Raw OpenXR tracking space, independent of boat yaw and visual waves.
+            FQuat orientation=FQuat::Identity;FVector position=FVector::ZeroVector;
+            in.head.valid=xr.IsValid() && xr->IsTracking(IXRTrackingSystem::HMDDeviceId) &&
+                xr->GetCurrentPose(IXRTrackingSystem::HMDDeviceId,orientation,position);
+            if(in.head.valid) {
+                const auto forward=orientation.GetForwardVector();
+                in.head.position={position.X/100.,position.Y/100.,position.Z/100.};
+                in.head.forward={forward.X,forward.Y,forward.Z};in.head.received=in.now;
+            }
+        } else in.head.valid=in.head.valid && xr.IsValid() && xr->IsTracking(IXRTrackingSystem::HMDDeviceId);
     }
     return in;
 }
 void ARowPawn::Toggle() {
     if(Geography && !Geography->IsReady()) return;
+    if(UsePs4 && Model.reconnectPending) {
+        Model.pause();Notice=TEXT("PAUSED / SQUARE resumes");Record(TEXT("pause"));return;
+    }
     if(Model.state==row::State::Running) {
         Model.pause(); Notice.Empty(); Record(TEXT("pause"));
         UE_LOG(LogTemp,Display,TEXT("ROW_CONTROL action=pause")); return;
@@ -200,10 +218,13 @@ void ARowPawn::Toggle() {
         // Some keypads also generate repeated complete down/up pairs when held.
         UE_LOG(LogTemp,Display,TEXT("ROW_CONTROL action=calibration_continue")); return;
     }
-    ShowSetupPanel();
     const auto in=ReadInput();
+    if(UsePs4 && Model.state==row::State::Paused && Calibration.frame.valid && Model.start(in,Calibration.frame)) {
+        Notice.Empty();Record(TEXT("resume"));return;
+    }
+    ShowSetupPanel();
     if(!Calibration.begin(in)) {
-        Notice=TEXT("Enter received / check HMD + bar");
+        Notice=UsePs4?TEXT("SQUARE received / check HMD + PS4"):TEXT("Enter received / check HMD + bar");
         UE_LOG(LogTemp,Display,TEXT("ROW_CONTROL action=start_blocked head_valid=%d bar_valid=%d imu=%d"),in.head.valid,row::Model::barTracked(in),UseImu);
         return;
     }
@@ -258,6 +279,7 @@ void ARowPawn::Stop() {
 }
 void ARowPawn::Tick(float dt) {
     Super::Tick(dt); if(Devices) Snapshot=Devices->snapshot();
+    HandlePs4Controls(row::Devices::seconds(),!Geography || Geography->IsReady());
     if(Geography && !Offline && !AttributionAttached) {
         // Cesium owns and updates this widget. Present it in the HMD as well as the scene.
         auto credits=ACesiumCreditSystem::GetDefaultCreditSystem(this);
@@ -304,6 +326,10 @@ void ARowPawn::Tick(float dt) {
     }
     // Pose derivatives use the real frame interval; a hitch invokes core watchdog.
     const double moved=oldState==row::State::Calibrating?0:Model.tick(in,dt,MovementMagnification);
+    if(oldState==row::State::TrackingLost && Model.state==row::State::Running) {
+        Notice.Empty();Record(TEXT("ps4_reconnect_resume"));
+        UE_LOG(LogTemp,Display,TEXT("ROW_PS4_RECONNECTED resumed=1"));
+    }
     if(Model.state==row::State::Running) SimTime+=dt;
     if(oldState==row::State::Running && (oldBarSource!=Model.barTracking.source || Model.state==row::State::TrackingLost)) {
         Record(Model.state==row::State::TrackingLost?TEXT("tracking_lost"):TEXT("bar_source_changed"));
@@ -360,7 +386,7 @@ void ARowPawn::Tick(float dt) {
         Panel->Speed=FString::Printf(TEXT("%.1f"),Model.speed*3.6*MovementMagnification);
         const auto hr=Snapshot.heart;
         Panel->Heart=hr.fresh(in.now,5) && hr.value>0?FString::Printf(TEXT("%.0f"),hr.value):TEXT("--");
-        const TCHAR* rowing=Model.barTracking.source==row::BarSource::Imu?TEXT("ROWING / WIT IMU"):
+        const TCHAR* rowing=Model.barTracking.source==row::BarSource::Imu?(UsePs4?TEXT("ROWING / PS4 IMU"):TEXT("ROWING / WIT IMU")):
             Model.barTracking.source==row::BarSource::HmdAssist?TEXT("ROWING / HMD ASSIST"):
             Model.barTracking.source==row::BarSource::Coast?TEXT("BAR LOST / COASTING"):
             Model.barTracking.source==row::BarSource::Reacquiring?TEXT("BAR RETURNING / COASTING"):TEXT("ROWING");
@@ -368,6 +394,12 @@ void ARowPawn::Tick(float dt) {
             Model.state==row::State::TrackingLost?TEXT("TRACKING LOST / NUM ENTER"):TEXT("READY / NUM ENTER");
         Panel->Status=!Notice.IsEmpty()?Notice:Demo?FString::Printf(TEXT("DEMO / %s"),state):FString(state);
         Panel->Guide=TEXT("NUM ENTER Start / Pause     NUM 0 Stop / Home     Lean left / right to steer");
+        if(UsePs4) {
+            Panel->Guide=TEXT("SQUARE Start/Pause  TRIANGLE Stop/Home  L1/R1 Turn  L2/R2 Strong");
+            if(Model.reconnectPending) Panel->Status=TEXT("PS4 RECONNECTING / AUTO RESUME");
+        }
+        Panel->ButtonSteering=UsePs4;
+        Panel->SteeringInput=float(Model.steer);
         Panel->SteeringAvailable=Calibration.frame.valid && row::Model::headTracking(in) && Model.state!=row::State::Calibrating;
         Panel->LeanCm=float((Model.state==row::State::Running?Model.lean:row::dot(in.head.position-Model.neutralHead,Model.right))*100);
         if(Model.state==row::State::Calibrating) {
@@ -387,6 +419,11 @@ void ARowPawn::Tick(float dt) {
                     TEXT("ENTER received. Move the bar out and back twice. Starts automatically. NUM 0 cancels.");
             }
         }
+        if(UsePs4) {
+            Panel->Status.ReplaceInline(TEXT("NUM ENTER"),TEXT("SQUARE"));
+            Panel->Guide.ReplaceInline(TEXT("NUM ENTER"),TEXT("SQUARE"));
+            Panel->Guide.ReplaceInline(TEXT("NUM 0"),TEXT("TRIANGLE"));
+        }
         const bool estimateAvailable=Model.state==row::State::Running &&
             (Model.barTracking.source==row::BarSource::Tracker || Model.barTracking.source==row::BarSource::HmdAssist || Model.barTracking.source==row::BarSource::Imu);
         const auto output=row::samplePower(in.telemetry,in.now,estimateAvailable?Model.barVelocity:0.);
@@ -405,6 +442,16 @@ void ARowPawn::Tick(float dt) {
         UE_LOG(LogTemp,Display,TEXT("ROW_PREVIEW_CAPTURE distance_m=%.2f state=%d"),Model.distance,int(Model.state));
     }
     if(QuitAfter>0 && time>QuitAfter) UKismetSystemLibrary::QuitGame(this,nullptr,EQuitPreference::Quit,false);
+}
+void ARowPawn::HandlePs4Controls(double now,bool ready) {
+    if(!UsePs4) return;
+    const auto& controls=Snapshot.ps4;
+    const bool stop=controls.stops!=Ps4Stops,start=controls.starts!=Ps4Starts;
+    // Consume even during loading/staleness so old presses cannot start later.
+    Ps4Starts=controls.starts;Ps4Stops=controls.stops;
+    if(!ready || !controls.fresh(now)) return;
+    if(stop) {PendingCommands.Empty();PendingCommands.Add(false);}
+    else if(start) PendingCommands.Add(true);
 }
 void ARowPawn::Record(const TCHAR* event) {
     if(SessionFile.IsEmpty()) return;

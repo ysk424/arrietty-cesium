@@ -12,6 +12,8 @@ public:
     double MovementMagnification=1;
     float LeanCm=0;
     bool SteeringAvailable=false;
+    bool ButtonSteering=false;
+    float SteeringInput=0;
     virtual int32 NativePaint(const FPaintArgs&,const FGeometry&,const FSlateRect&,FSlateWindowElementList&,
         int32,const FWidgetStyle&,bool) const override;
 };

@@ -1,12 +1,14 @@
 #pragma once
 #include "RowCore.h"
 #include "RowImu.h"
+#include "RowPs4.h"
 #include <memory>
 #include <string>
 
 namespace row {
 struct DeviceConfig {
     std::string trackerSerial;
+    std::string ps4Path; // Explicit local HID selection, never logged.
     uint64_t rowerAddress=0,heartAddress=0,imuAddress=0;
     bool enableVr=true;
     int imuAddressType=-1; // 0 public, 1 random, -1 requires advertisement.
@@ -16,6 +18,7 @@ struct DeviceConfig {
 struct DeviceSnapshot {
     Pose bar,head;
     ImuSample imu;
+    Ps4Controls ps4;
     Telemetry telemetry;
     Field heart;
     bool vrReady=false,rowerConnected=false,heartConnected=false;

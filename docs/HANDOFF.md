@@ -1,5 +1,34 @@
 # Current handoff — 2026-09-19
 
+Row PS4 follow-up: user mounted a PS4-compatible controller in place of the
+WIT accelerometer, facing forward about 40 degrees up. Implemented PS4 gyro /
+accel input and OpenXR HMD for both Quest and VIVE. Square=start/pause/resume,
+triangle=stop/home (circle interferes with the hand); L1/R1 normal turn,
+L2/R2 stronger turn while held. PS4 mode never steers with HMD lean/gaze.
+User explicitly rejected manual restart after communication loss: automatically
+resume a previously active ride on valid PS4+HMD recovery; manual pause/Home
+remain stopped. The user declared today's changes finished and explicitly
+requested documentation and push on 2026-09-19. This is not a report of detailed
+Row/PS4 live acceptance; preserve the remaining checks below.
+See ROW_PS4.ja.md for selection, filters, controls and measured limits. The
+mounted recording gives 11 detections for the requested 10-cycle exercise
+(9 following online calibration); actual count/last movement still unverified.
+Do not call this live rowing acceptance. Private recordings are under logs/row.
+After the user exited the never-started Row instance, local settings were switched
+to `bar_input=ps4`. Windows retained two PS4 interfaces (USB and Bluetooth); the
+unique Bluetooth interface corresponding to the tested controller was selected
+privately, and the old settings backed up under logs/row. At the last device check
+the controller was disconnected; native reception/shutdown verification remains
+pending its return. The user's earlier normal Row launch used the old WIT setting
+and logged HMD valid / bar invalid; that launch did not establish PS4 operation.
+`ps4_probe.py --select` can reselect after pairing changes. Native device_probe has
+`--ps4-only`: its private text settings file contains only the selected HID path;
+this mode starts no OpenVR, rower, heart or WIT worker. Run it for the final native
+reception/shutdown check. See VALIDATION for completed software tests.
+
+User confirmed during this implementation that Quest 3 worked in Fly. Treat
+Fly/Quest HMD operation as user-confirmed, separate from Row/PS4 VR acceptance.
+
 Follow-up: the user requested removing P because taking Quest off to inspect the
 desktop blanks its view. Fly now automatically enters device preparation after
 terrain readiness, bridge handshake and applied time settings. Button 1 still
@@ -25,8 +54,9 @@ Joystick 1 SW tuning remains available with rudder zero while tuning; Joystick 2
 buttons, T2 controls, view-forward alignment, terrain and shutdown remain intact.
 See FLY_OPENXR.ja.md, INTEGRATION and VALIDATION for checks and limitations.
 Both Windows OpenXR registry views point to Meta on this PC. No sibling files
-or registry settings were changed. Quest display and physical stick acceptance
-are still unverified. The user requested publication on 2026-09-19 after these
+or registry settings were changed. Quest display was subsequently confirmed by
+the user as noted above; detailed physical stick acceptance remains unverified.
+The user requested publication on 2026-09-19 after these
 changes and confirmed the Codex completion beep was audible and useful. That
 notification feedback is separate from Fly audio or live VR acceptance.
 

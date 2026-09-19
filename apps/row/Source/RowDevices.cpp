@@ -6,6 +6,8 @@
 #endif
 #include "RowDevices.h"
 #include <openvr.h>
+#include <windows.h>
+#include <hidsdi.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Devices.Bluetooth.h>
@@ -26,6 +28,7 @@ using namespace Windows::Storage::Streams;
 using namespace std::chrono_literals;
 double Devices::seconds() { return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
 struct Shared { mutable std::mutex mutex; DeviceSnapshot data; std::atomic<bool> stop=false; };
+#include "RowPs4Devices.inl"
 static guid uuid(uint32_t shortId,bool wit=false) { return {shortId,0,0x1000,{0x80,0,0,0x80,0x5f,uint8_t(wit?0x9a:0x9b),0x34,0xfb}}; }
 // WinRT calls have bounded waits and cooperative cancellation, including connect.
 template<class Async> auto waitFor(Async op,const std::shared_ptr<Shared>& s) {
@@ -176,12 +179,13 @@ static void vrLoop(std::shared_ptr<Shared> s,std::string serial,bool deferShutdo
 }
 struct Devices::Impl {
     std::shared_ptr<Shared> shared=std::make_shared<Shared>();
-    std::thread vr,ble,hr,imu;
+    std::thread vr,ble,hr,imu,ps4;
     explicit Impl(DeviceConfig c):
         vr([s=shared,c] { if(c.enableVr) vrLoop(s,c.trackerSerial,c.deferVrShutdown); }),
         ble(bleLoop,shared,c.rowerAddress,BleRole::Rower,-1),hr(bleLoop,shared,c.heartAddress,BleRole::Heart,-1),
-        imu(bleLoop,shared,c.imuAddress,BleRole::Imu,c.imuAddressType) {}
-    ~Impl() { shared->stop=true; vr.join(); ble.join(); hr.join(); imu.join(); }
+        imu(bleLoop,shared,c.imuAddress,BleRole::Imu,c.imuAddressType),
+        ps4(ps4Loop,shared,c.ps4Path) {}
+    ~Impl() { shared->stop=true; vr.join(); ble.join(); hr.join(); imu.join(); ps4.join(); }
 };
 Devices::Devices(DeviceConfig c):impl(std::make_unique<Impl>(c)) {}
 Devices::~Devices()=default;

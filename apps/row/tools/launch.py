@@ -87,7 +87,7 @@ def main():
     # Only the inherited environment carries a token override, never argv or scene JSON.
     env=os.environ.copy();env['CESIUM_ION_TOKEN']=token
     env.pop('OPENAI_API_KEY',None)
-    print('Cesium の地形を読み込んでいます。準備が終わったら Enter で開始できます。',flush=True)
+    print('Cesium の地形を読み込んでいます。準備後、PS4設定では□、キーボードではEnterで開始します。',flush=True)
     from arrietty_geo.live import live_session
     with live_session(not args.demo):
         return subprocess.call(command,env=env)

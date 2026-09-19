@@ -22,20 +22,21 @@ int32 URowPanel::NativePaint(const FPaintArgs&,const FGeometry& g,const FSlateRe
     box(25,195,950,1,FLinearColor(.07,.17,.16));
     text(25,215,Detail,18,white);
     const float margin=float(row::Model::StraightMargin*100),pixelsPerCm=6;
-    const bool centered=FMath::Abs(LeanCm)<=margin;
+    const float shown=ButtonSteering?SteeringInput*30:LeanCm;
+    const bool centered=ButtonSteering?SteeringInput==0:FMath::Abs(LeanCm)<=margin;
     const FLinearColor amber(1.f,.70f,.26f);
-    text(25,265,SteeringAvailable?(centered?TEXT("CENTER"):LeanCm<0?TEXT("LEFT"):TEXT("RIGHT")):TEXT("SETUP"),22,
+    text(25,265,SteeringAvailable?(centered?TEXT("CENTER"):shown<0?TEXT("LEFT"):TEXT("RIGHT")):TEXT("SETUP"),22,
         SteeringAvailable?(centered?mint:amber):muted);
     text(257,269,TEXT("LEFT"),14,muted); text(712,269,TEXT("RIGHT"),14,muted);
     box(320,275,360,12,FLinearColor(.06f,.13f,.14f));
     box(500-margin*pixelsPerCm,273,2*margin*pixelsPerCm,16,FLinearColor(.10f,.35f,.26f));
     box(499,269,2,24,muted);
     if(SteeringAvailable) {
-        const float marker=500+FMath::Clamp(LeanCm,-30.f,30.f)*pixelsPerCm;
+        const float marker=500+FMath::Clamp(shown,-30.f,30.f)*pixelsPerCm;
         box(marker-3,269,6,24,centered?mint:amber);
-        text(795,265,FString::Printf(TEXT("%+.1f cm"),LeanCm),22,centered?mint:amber);
+        text(795,265,ButtonSteering?(centered?TEXT("STRAIGHT"):FMath::Abs(SteeringInput)>.75?TEXT("STRONG"):TEXT("NORMAL")):FString::Printf(TEXT("%+.1f cm"),LeanCm),22,centered?mint:amber);
     }
-    text(400,299,TEXT("STRAIGHT  +/- 8 cm"),14,muted);
+    text(400,299,ButtonSteering?TEXT("RELEASE TO GO STRAIGHT"):TEXT("STRAIGHT  +/- 8 cm"),14,muted);
     text(25,334,Guide,14,muted);
     return layer+2;
 }
