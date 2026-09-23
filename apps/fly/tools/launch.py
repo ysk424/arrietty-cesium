@@ -89,7 +89,7 @@ def main():
     p.add_argument('--start-mode',choices=['ground','air'],default='ground');p.add_argument('--start-agl',type=float,default=100);p.add_argument('--radius-km',type=float,default=10)
     p.add_argument('--magnification',type=float,default=1)
     p.add_argument('--volume',type=float,default=.8)
-    p.add_argument('--date',default='');p.add_argument('--time',default='12:00');p.add_argument('--model',default=os.environ.get('ARRIETTY_OPENAI_MODEL','gpt-5.4-mini'))
+    p.add_argument('--date',default='');p.add_argument('--time',default='12:00');p.add_argument('--model',default=os.environ.get('ARRIETTY_OPENAI_MODEL','gpt-6-luna'))
     p.add_argument('--engine-root',default='C:/Program Files/Epic Games/UE_5.8')
     args=p.parse_args()
     place=resolve(args.place,args.model,args.refresh_place)

@@ -207,7 +207,7 @@ Cesium 2.29.1・EGM96を共通管理し、各アプリのビルド出力・Pytho
 ./tools/test.ps1                # 実機なしの自動テスト
 ```
 
-- `OPENAI_API_KEY`: 場所検索用。モデルは`gpt-5.4-mini`、`-Model`または`ARRIETTY_OPENAI_MODEL`で変更できます。
+- `OPENAI_API_KEY`: 場所検索用。モデルは`gpt-6-luna`、`-Model`または`ARRIETTY_OPENAI_MODEL`で変更できます。
 - `config/cesium.local.json`: Cesiumの設定。`CESIUM_ION_TOKEN`環境変数が優先されます。
 - `config/row.local.json`: ローイングの機器設定。
 - `config/fly.local.json`: 自転車・飛行の機器設定。

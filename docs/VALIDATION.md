@@ -1,3 +1,12 @@
+# Model default update — 2026-09-23
+
+- Row/Fly place lookup defaults: `gpt-6-luna`.
+- Row Python unittest discovery: 14 passed.
+- Fly `test_fly_launcher.py`: 2 passed.
+- `git diff --check`: passed (line-ending warnings only).
+- Tests used existing mocked/offline paths. Live OpenAI availability and place quality,
+  UE and VR behavior were not tested in this change.
+
 # Row / Fly integration validation — 2026-09-19
 
 ## ROW recommendations (no terrain downloads)

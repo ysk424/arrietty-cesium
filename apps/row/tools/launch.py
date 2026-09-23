@@ -22,7 +22,7 @@ def main():
     p.add_argument('--radius-km',type=float,default=3)
     p.add_argument('--magnification','--mag',type=float,default=1)
     p.add_argument('--water-level',type=float)
-    p.add_argument('--model',default=os.environ.get('ARRIETTY_OPENAI_MODEL','gpt-5.4-mini'))
+    p.add_argument('--model',default=os.environ.get('ARRIETTY_OPENAI_MODEL','gpt-6-luna'))
     p.add_argument('--engine-root',default='C:/Program Files/Epic Games/UE_5.8')
     args=p.parse_args()
     if not math.isfinite(args.volume) or not 0<=args.volume<=1:

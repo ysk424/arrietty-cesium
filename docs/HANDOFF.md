@@ -1,3 +1,11 @@
+# Model update — 2026-09-23
+
+Row/Fly place lookup defaults now use `gpt-6-luna` instead of `gpt-5.4-mini`.
+Explicit model arguments and ARRIETTY_OPENAI_MODEL overrides remain supported.
+Responses API, web search, structured output and geographic safety rules are unchanged.
+Validation: 14 Row Python tests and 2 Fly launcher tests passed; no live API
+request, UE rebuild or VR acceptance test was performed. Publication requested on 2026-09-23.
+
 # Current handoff — 2026-09-19
 
 ROW recommendations: root reco.json contains 31 scenic sea/lake candidates with

@@ -53,7 +53,7 @@ def validate_place(place):
     return place
 
 
-def resolve_place(query, model='gpt-5.4-mini', refresh=False):
+def resolve_place(query, model='gpt-6-luna', refresh=False):
     query = safe_text(query, 'place query')
     props = {k: {'type': 'string'} for k in ('name','name_ja','country','country_ja','region_ja','osm_query')}
     props.update(status={'type':'string','enum':['found','not_found','unsupported']},
